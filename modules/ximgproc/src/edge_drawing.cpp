@@ -109,9 +109,11 @@ public:
     void getGradientImage(OutputArray dst) CV_OVERRIDE;
 
     vector<vector<Point> > getSegments() CV_OVERRIDE;
+    vector<int> getSegmentIndicesOfLines() const CV_OVERRIDE;
     void detectLines(OutputArray lines) CV_OVERRIDE;
     void detectEllipses(OutputArray ellipses) CV_OVERRIDE;
 
+    virtual String getDefaultName() const CV_OVERRIDE;
     virtual void read(const FileNode& fn) CV_OVERRIDE;
     virtual void write(FileStorage& fs) const CV_OVERRIDE;
 
@@ -120,6 +122,7 @@ protected:
     int height;       // height of source image
     uchar *srcImg;
     vector<vector<Point> > segmentPoints;
+    vector<int> segmentIndicesOfLines;
     Mat smoothImage;
     uchar *edgeImg;   // pointer to edge image data
     uchar *smoothImg; // pointer to smoothed image data
@@ -154,10 +157,7 @@ private:
     int gradThresh;   // gradient threshold
     int anchorThresh; // anchor point threshold
 
-
-    static void SplitSegment2Lines(double* x, double* y, int noPixels, int segmentNo, std::vector<EDLineSegment>& lines, int min_line_len = 6, double line_error = 1.0);
     std::vector<EDLineSegment> lines;
-    std::vector<EDLineSegment> invalidLines;
     int linesNo;
     int min_line_len;
     double line_error;
@@ -216,12 +216,11 @@ private:
     void JoinArcs3();
 
     // circle utility functions
-    static Circle* addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, double* x, double* y, int noPixels);
-    static Circle* addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, EllipseEquation* pEq, double ellipseFitError, double* x, double* y, int noPixels);
+    static void addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, double* x, double* y, int noPixels);
+    static void addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, EllipseEquation* pEq, double ellipseFitError, double* x, double* y, int noPixels);
     static void sortCircles(Circle* circles, int noCircles);
     static bool CircleFit(double* x, double* y, int N, double* pxc, double* pyc, double* pr, double* pe);
     static void ComputeCirclePoints(double xc, double yc, double r, double* px, double* py, int* noPoints);
-    static void sortCircle(Circle* circles, int noCircles);
 
     // ellipse utility functions
     static bool EllipseFit(double* x, double* y, int noPoints, EllipseEquation* pResult, int mode = FPF);
@@ -232,7 +231,7 @@ private:
     static void DeallocateMatrix(double** m, int noRows);
     static void AperB_T(double** A_, double** B_, double** _res, int _righA, int _colA, int _righB, int _colB);
     static void AperB(double** A_, double** B_, double** _res, int _righA, int _colA, int _righB, int _colB);
-    static void jacobi(double** a, int n, double d[], double** v, int nrot);
+    static void jacobi(double** a, int n, double d[], double** v);
     static void ROTATE(double** a, int i, int j, int k, int l, double tau, double s);
     static double computeEllipsePerimeter(EllipseEquation* eq);
     static double ComputeEllipseError(EllipseEquation* eq, double* px, double* py, int noPoints);
@@ -319,6 +318,11 @@ void EdgeDrawing::Params::write(cv::FileStorage& fs) const
     fs << "MaxErrorThreshold" << MaxErrorThreshold;
 }
 
+String EdgeDrawingImpl::getDefaultName() const
+{
+    return String("EdgeDrawing");
+}
+
 void EdgeDrawingImpl::read(const cv::FileNode& fn)
 {
     params.read(fn);
@@ -347,6 +351,7 @@ EdgeDrawingImpl::~EdgeDrawingImpl()
 
 void EdgeDrawingImpl::detectEdges(InputArray src)
 {
+    CV_Assert(!src.empty() && src.type() == CV_8UC1);
     gradThresh = params.GradientThresholdValue;
     anchorThresh = params.AnchorThresholdValue;
     op = params.EdgeDetectionOperator;
@@ -365,7 +370,6 @@ void EdgeDrawingImpl::detectEdges(InputArray src)
     anchorNos = 0;
     anchorPoints.clear();
     lines.clear();
-    invalidLines.clear();
     segmentPoints.clear();
     segmentPoints.push_back(vector<Point>()); // create empty vector of points for segments
     srcImage = src.getMat();
@@ -443,6 +447,11 @@ void EdgeDrawingImpl::getGradientImage(OutputArray _dst)
 std::vector<std::vector<Point> > EdgeDrawingImpl::getSegments()
 {
     return segmentPoints;
+}
+
+std::vector<int> EdgeDrawingImpl::getSegmentIndicesOfLines() const
+{
+    return segmentIndicesOfLines;
 }
 
 void EdgeDrawingImpl::ComputeGradient()
@@ -1270,8 +1279,12 @@ int EdgeDrawingImpl::RetrieveChainNos(Chain* chains, int root, int chainNos[])
 
 void EdgeDrawingImpl::detectLines(OutputArray _lines)
 {
+    std::vector<Vec4f> linePoints;
     if (segmentPoints.size() < 1)
+    {
+        Mat(linePoints).copyTo(_lines);
         return;
+    }
 
     min_line_len = params.MinLineLength;
     line_error = params.LineFitErrorThreshold;
@@ -1288,6 +1301,7 @@ void EdgeDrawingImpl::detectLines(OutputArray _lines)
     double* x = new double[(width + height) * 8];
     double* y = new double[(width + height) * 8];
 
+    lines.clear();
     linesNo = 0;
 
     // Use the whole segment
@@ -1304,17 +1318,8 @@ void EdgeDrawingImpl::detectLines(OutputArray _lines)
 
     JoinCollinearLines();
 
-#define PRECISON_ANGLE 22.5
-    precision = (PRECISON_ANGLE / 180) * CV_PI;
-#undef PRECISON_ANGLE
-
-    if (nfa->LUTSize == 1 && params.NFAValidation)
-    {
-        int lutSize = (width + height) / 8;
-        double prob = 1.0 / 8;  // probability of alignment
-        nfa = new NFALUT(lutSize, prob, width, height);
+    if (params.NFAValidation)
         ValidateLineSegments();
-    }
 
     // Delete redundant space from lines
     // Pop them back
@@ -1322,16 +1327,17 @@ void EdgeDrawingImpl::detectLines(OutputArray _lines)
     for (int i = 1; i <= size - linesNo; i++)
         lines.pop_back();
 
-    std::vector<Vec4f> linePoints;
+    segmentIndicesOfLines.clear();
     for (int i = 0; i < linesNo; i++)
     {
         Vec4f line((float)lines[i].sx, (float)lines[i].sy, (float)lines[i].ex, (float)lines[i].ey);
         linePoints.push_back(line);
+        segmentIndicesOfLines.push_back(lines[i].segmentNo);
     }
+    Mat(linePoints).copyTo(_lines);
 
     delete[] x;
     delete[] y;
-    Mat(linePoints).copyTo(_lines);
 }
 
 // Computes the minimum line length using the NFA formula given width & height values
@@ -1345,7 +1351,7 @@ int EdgeDrawingImpl::ComputeMinLineLength()
 
     double logNT = 2.0 * (log10((double)width) + log10((double)height));
     return (int)round((-logNT / log10(0.125)) * 0.5);
-} //end-ComputeMinLineLength
+}
 
 //-----------------------------------------------------------------
 // Given a full segment of pixels, splits the chain to lines
@@ -1434,10 +1440,14 @@ void EdgeDrawingImpl::SplitSegment2Lines(double* x, double* y, int noPixels, int
                     index--;
                 ComputeClosestPoint(x[index], y[index], lastA, lastB, lastInvert, ex, ey);
 
+                if ((sx == ex) & (sy == ey))
+                    break;
+
                 // Add the line segment to lines
                 lines.push_back(EDLineSegment(lastA, lastB, lastInvert, sx, sy, ex, ey, segmentNo, firstPixelIndex + noSkippedPixels, index - noSkippedPixels + 1));
                 linesNo++;
                 len = index + 1;
+
                 break;
             }
         }
@@ -1499,6 +1509,17 @@ void EdgeDrawingImpl::JoinCollinearLines()
 
 void EdgeDrawingImpl::ValidateLineSegments()
 {
+#define PRECISION_ANGLE 22.5
+    precision = (PRECISION_ANGLE / 180) * CV_PI;
+#undef PRECISION_ANGLE
+
+    if (nfa->LUTSize == 1)
+    {
+        int lutSize = (width + height) / 8;
+        double prob = 1.0 / 8;  // probability of alignment
+        nfa = new NFALUT(lutSize, prob, width, height);
+    }
+
     int* x = new int[(width + height) * 4];
     int* y = new int[(width + height) * 4];
 
@@ -1586,9 +1607,7 @@ void EdgeDrawingImpl::ValidateLineSegments()
             }
 
             // Check validation by NFA computation (fast due to LUT)
-            valid = nfa->checkValidationByNFA(count, aligned);
-            if (valid == false)
-                valid = ValidateLineSegmentRect(x, y, ls);
+            valid = nfa->checkValidationByNFA(count, aligned) || ValidateLineSegmentRect(x, y, ls);
         }
 
         if (valid)
@@ -1596,10 +1615,6 @@ void EdgeDrawingImpl::ValidateLineSegments()
             if (i != noValidLines)
                 lines[noValidLines] = lines[i];
             noValidLines++;
-        }
-        else
-        {
-            invalidLines.push_back(lines[i]);
         }
     }
 
@@ -2295,102 +2310,6 @@ void EdgeDrawingImpl::EnumerateRectPoints(double sx, double sy, double ex, doubl
     *pNoPoints = noPoints;
 }
 
-void EdgeDrawingImpl::SplitSegment2Lines(double* x, double* y, int noPixels, int segmentNo, vector<EDLineSegment>& lines, int min_line_len, double line_error)
-{
-    // First pixel of the line segment within the segment of points
-    int firstPixelIndex = 0;
-
-    while (noPixels >= min_line_len)
-    {
-        // Start by fitting a line to MIN_LINE_LEN pixels
-        bool valid = false;
-        double lastA(0), lastB(0), error;
-        int lastInvert(0);
-
-        while (noPixels >= min_line_len)
-        {
-            LineFit(x, y, min_line_len, lastA, lastB, error, lastInvert);
-            if (error <= 0.5)
-            {
-                valid = true;
-                break;
-            }
-
-            noPixels -= 1;   // Go slowly
-            x += 1;
-            y += 1;
-            firstPixelIndex += 1;
-        }
-
-        if (valid == false)
-            return;
-
-        // Now try to extend this line
-        int index = min_line_len;
-        int len = min_line_len;
-
-        while (index < noPixels)
-        {
-            int startIndex = index;
-            int lastGoodIndex = index - 1;
-            int goodPixelCount = 0;
-            int badPixelCount = 0;
-            while (index < noPixels)
-            {
-                double d = ComputeMinDistance(x[index], y[index], lastA, lastB, lastInvert);
-
-                if (d <= line_error)
-                {
-                    lastGoodIndex = index;
-                    goodPixelCount++;
-                    badPixelCount = 0;
-                }
-                else
-                {
-                    badPixelCount++;
-                    if (badPixelCount >= 5)
-                        break;
-                }
-                index++;
-            }
-
-            if (goodPixelCount >= 2)
-            {
-                len += lastGoodIndex - startIndex + 1;
-                LineFit(x, y, len, lastA, lastB, lastInvert);
-                index = lastGoodIndex + 1;
-            }
-
-            if (goodPixelCount < 2 || index >= noPixels)
-            {
-                // End of a line segment. Compute the end points
-                double sx, sy, ex, ey;
-
-                index = 0;
-                while (ComputeMinDistance(x[index], y[index], lastA, lastB, lastInvert) > line_error)
-                    index++;
-                ComputeClosestPoint(x[index], y[index], lastA, lastB, lastInvert, sx, sy);
-                int noSkippedPixels = index;
-
-                index = lastGoodIndex;
-                while (ComputeMinDistance(x[index], y[index], lastA, lastB, lastInvert) > line_error)
-                    index--;
-                ComputeClosestPoint(x[index], y[index], lastA, lastB, lastInvert, ex, ey);
-
-                // Add the line segment to lines
-                lines.push_back(EDLineSegment(lastA, lastB, lastInvert, sx, sy, ex, ey, segmentNo, firstPixelIndex + noSkippedPixels, index - noSkippedPixels + 1));
-                len = index + 1;
-                break;
-            }
-        }
-
-        noPixels -= len;
-        x += len;
-        y += len;
-        firstPixelIndex += len;
-    }
-}
-
 /*--------------------------------------EDPF----------------------------------------*/
 
 //----------------------------------------------------------------------------------
@@ -2511,19 +2430,24 @@ double EdgeDrawingImpl::NFA(double prob, int len)
 
 void EdgeDrawingImpl::detectEllipses(OutputArray ellipses)
 {
-    if (segmentPoints.size() < 1)
-        return;
-
     vector<Vec6d> _ellipses;
-	Circles.clear();
-	Ellipses.clear();
+    if (segmentPoints.size() < 1)
+    {
+        Mat(_ellipses).copyTo(ellipses);
+        return;
+    }
+
+    min_line_len = 6;
+    line_error = params.LineFitErrorThreshold;
+    Circles.clear();
+    Ellipses.clear();
+    lines.clear();
     // Arcs & circles to be detected
     // If the end-points of the segment is very close to each other,
     // then directly fit a circle/ellipse instread of line fitting
     noCircles1 = 0;
     circles1 = new Circle[(width + height) * 8];
 
-    // ----------------------------------- DETECT LINES ---------------------------------
     int bufferSize = 0;
     for (int i = 0; i < (int)segmentPoints.size(); i++)
         bufferSize += (int)segmentPoints[i].size();
@@ -2611,9 +2535,10 @@ void EdgeDrawingImpl::detectEllipses(OutputArray ellipses)
             }
         }
         // Otherwise, split to lines
-        SplitSegment2Lines(x, y, noPixels, i, lines);
+        SplitSegment2Lines(x, y, noPixels, i);
     }
 
+    min_line_len = params.MinLineLength;
     segmentStartLines[segmentNos] = (int)lines.size();
 
     // ------------------------------- DETECT ARCS ---------------------------------
@@ -3157,7 +3082,6 @@ void EdgeDrawingImpl::DetectArcs()
                     if ((coverage >= FULL_CIRCLE_RATIO && circleFitError <= LONG_ARC_ERROR))
                     {
                         addCircle(circles1, noCircles1, XC, YC, R, Error, x, y, noPixels);
-
                     }
                     else
                     {
@@ -3173,7 +3097,6 @@ void EdgeDrawingImpl::DetectArcs()
                     y += noPixels;
 
                     firstLine = curLine;
-                    info[curLine].taken = false;    // may reuse the last line?
                 }
                 firstLine = lastLine;
             }
@@ -3187,15 +3110,10 @@ void EdgeDrawingImpl::DetectArcs()
 void EdgeDrawingImpl::ValidateCircles(bool validate)
 {
     precision = CV_PI / 16;  // Alignment precision
-    double max = width;
-    if (height > max)
-        max = height;
-    double min = width;
-    if (height < min)
-        min = height;
 
-    double* px = new double[8 * (width + height)];
-    double* py = new double[8 * (width + height)];
+    int points_buffer_size = 8 * (width + height);
+    double *px = new double[points_buffer_size];
+    double *py = new double[points_buffer_size];
 
     if (nfa->LUTSize == 1 && params.NFAValidation)
     {
@@ -3223,14 +3141,16 @@ void EdgeDrawingImpl::ValidateCircles(bool validate)
 
         validateAgain = false;
 
-        int noPoints = 0;
+        int noPoints = (int)(computeEllipsePerimeter(&circle->eq));
+
+        if (noPoints > points_buffer_size)
+        {
+            i++;
+            continue;
+        }
 
         if (circle->isEllipse)
         {
-            noPoints = std::min(static_cast<int>(computeEllipsePerimeter(&circle->eq)), 8 * (width + height));
-
-            if (noPoints % 2)
-                noPoints--;
             ComputeEllipsePoints(circle->eq.coeff, px, py, noPoints);
         }
         else
@@ -3451,7 +3371,7 @@ void EdgeDrawingImpl::ValidateCircles(bool validate)
 void EdgeDrawingImpl::JoinCircles()
 {
     // Sort the circles wrt their radius
-    sortCircle(circles2, noCircles2);
+    sortCircles(circles2, noCircles2);
 
     noCircles = noCircles2;
     Circle* circles = circles2;
@@ -4449,7 +4369,7 @@ void EdgeDrawingImpl::JoinArcs3()
     delete[] candidateArcs;
 }
 
-Circle* EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, double* x, double* y, int noPixels)
+void EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, double* x, double* y, int noPixels)
 {
     circles[noCircles].xc = xc;
     circles[noCircles].yc = yc;
@@ -4464,11 +4384,9 @@ Circle* EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, d
     circles[noCircles].isEllipse = false;
 
     noCircles++;
-
-    return &circles[noCircles - 1];
 }
 
-Circle* EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, EllipseEquation* pEq, double ellipseFitError, double* x, double* y, int noPixels)
+void EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, double yc, double r, double circleFitError, EllipseEquation* pEq, double ellipseFitError, double* x, double* y, int noPixels)
 {
     circles[noCircles].xc = xc;
     circles[noCircles].yc = yc;
@@ -4485,8 +4403,6 @@ Circle* EdgeDrawingImpl::addCircle(Circle* circles, int& noCircles, double xc, d
     circles[noCircles].isEllipse = true;
 
     noCircles++;
-
-    return &circles[noCircles - 1];
 }
 
 void EdgeDrawingImpl::sortCircles(Circle* circles, int noCircles)
@@ -4862,12 +4778,9 @@ double EdgeDrawingImpl::ComputeEllipseCenterAndAxisLengths(EllipseEquation* eq, 
 // ---------------------------------------------------------------------------
 // Given an ellipse equation, computes "noPoints" many consecutive points
 // on the ellipse periferi. These points can be used to draw the ellipse
-// noPoints must be an even number.
 //
 void EdgeDrawingImpl::ComputeEllipsePoints(double* pvec, double* px, double* py, int noPoints)
 {
-    if (noPoints % 2)
-        noPoints--;
     int npts = noPoints / 2;
 
     double** u = AllocateMatrix(3, npts + 1);
@@ -5423,26 +5336,6 @@ void EdgeDrawingImpl::ComputeCirclePoints(double xc, double yc, double r, double
     *noPoints = count;
 }
 
-void EdgeDrawingImpl::sortCircle(Circle* circles, int noCircles)
-{
-    for (int i = 0; i < noCircles - 1; i++)
-    {
-        int max = i;
-        for (int j = i + 1; j < noCircles; j++)
-        {
-            if (circles[j].r > circles[max].r)
-                max = j;
-        }
-
-        if (max != i)
-        {
-            Circle t = circles[i];
-            circles[i] = circles[max];
-            circles[max] = t;
-        }
-    }
-}
-
 bool EdgeDrawingImpl::EllipseFit(double* x, double* y, int noPoints, EllipseEquation* pResult, int mode)
 {
     double** D = AllocateMatrix(noPoints + 1, 7);
@@ -5457,7 +5350,6 @@ bool EdgeDrawingImpl::EllipseFit(double* x, double* y, int noPoints, EllipseEqua
     double** V = AllocateMatrix(7, 7);
     double** sol = AllocateMatrix(7, 7);
     double tx, ty;
-    int nrot = 0;
 
     memset(d, 0, sizeof(double) * 7);
 
@@ -5501,7 +5393,7 @@ bool EdgeDrawingImpl::EllipseFit(double* x, double* y, int noPoints, EllipseEqua
     AperB_T(Const, invL, temp, 6, 6, 6, 6);
     AperB(invL, temp, C, 6, 6, 6, 6);
 
-    jacobi(C, 6, d, V, nrot);
+    jacobi(C, 6, d, V);
 
     A_TperB(invL, V, sol, 6, 6, 6, 6);
 
@@ -5721,8 +5613,8 @@ int EdgeDrawingImpl::inverse(double** TB, double** InvB, int N)
 void EdgeDrawingImpl::DeallocateMatrix(double** m, int noRows)
 {
     for (int i = 0; i < noRows; i++)
-        delete m[i];
-    delete m;
+        delete[] m[i];
+    delete[] m;
 }
 
 void EdgeDrawingImpl::AperB_T(double** A_, double** B_, double** _res, int _righA, int _colA, int _righB, int _colB)
@@ -5751,7 +5643,7 @@ void EdgeDrawingImpl::AperB(double** A_, double** B_, double** _res, int _righA,
         }
 }
 
-void EdgeDrawingImpl::jacobi(double** a, int n, double d[], double** v, int nrot)
+void EdgeDrawingImpl::jacobi(double** a, int n, double d[], double** v)
 {
     int j, iq, ip, i;
     double tresh, theta, tau, t, sm, s, h, g, c;
@@ -5772,7 +5664,6 @@ void EdgeDrawingImpl::jacobi(double** a, int n, double d[], double** v, int nrot
         b[ip] = d[ip] = a[ip][ip];
         z[ip] = 0.0;
     }
-    nrot = 0;
     for (i = 1; i <= 50; i++)
     {
         sm = 0.0;
@@ -5836,7 +5727,6 @@ void EdgeDrawingImpl::jacobi(double** a, int n, double d[], double** v, int nrot
                     {
                         ROTATE(v, j, ip, j, iq, tau, s);
                     }
-                    ++nrot;
                 }
             }
         }

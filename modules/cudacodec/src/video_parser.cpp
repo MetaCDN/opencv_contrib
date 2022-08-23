@@ -45,14 +45,15 @@
 
 #ifdef HAVE_NVCUVID
 
-cv::cudacodec::detail::VideoParser::VideoParser(VideoDecoder* videoDecoder, FrameQueue* frameQueue) :
-    videoDecoder_(videoDecoder), frameQueue_(frameQueue), unparsedPackets_(0), hasError_(false)
+cv::cudacodec::detail::VideoParser::VideoParser(VideoDecoder* videoDecoder, FrameQueue* frameQueue, const bool allowFrameDrop, const bool udpSource) :
+    videoDecoder_(videoDecoder), frameQueue_(frameQueue), allowFrameDrop_(allowFrameDrop)
 {
+    if (udpSource) maxUnparsedPackets_ = 0;
     CUVIDPARSERPARAMS params;
     std::memset(&params, 0, sizeof(CUVIDPARSERPARAMS));
 
     params.CodecType              = videoDecoder->codec();
-    params.ulMaxNumDecodeSurfaces = videoDecoder->maxDecodeSurfaces();
+    params.ulMaxNumDecodeSurfaces = 1;
     params.ulMaxDisplayDelay      = 1; // this flag is needed so the parser will push frames out to the decoder as quickly as it can
     params.pUserData              = this;
     params.pfnSequenceCallback    = HandleVideoSequence;    // Called before decoding frames and/or whenever there is a format change
@@ -62,7 +63,7 @@ cv::cudacodec::detail::VideoParser::VideoParser(VideoDecoder* videoDecoder, Fram
     cuSafeCall( cuvidCreateVideoParser(&parser_, &params) );
 }
 
-bool cv::cudacodec::detail::VideoParser::parseVideoData(const unsigned char* data, size_t size, bool endOfStream)
+bool cv::cudacodec::detail::VideoParser::parseVideoData(const unsigned char* data, size_t size, const bool rawMode, const bool containsKeyFrame, bool endOfStream)
 {
     CUVIDSOURCEDATAPACKET packet;
     std::memset(&packet, 0, sizeof(CUVIDSOURCEDATAPACKET));
@@ -73,18 +74,22 @@ bool cv::cudacodec::detail::VideoParser::parseVideoData(const unsigned char* dat
     packet.payload_size = static_cast<unsigned long>(size);
     packet.payload = data;
 
+    if (rawMode)
+        currentFramePackets.push_back(RawPacket(data, size, containsKeyFrame));
+
     if (cuvidParseVideoData(parser_, &packet) != CUDA_SUCCESS)
     {
+        CV_LOG_ERROR(NULL, "Call to cuvidParseVideoData failed!");
         hasError_ = true;
         frameQueue_->endDecode();
         return false;
     }
 
-    const int maxUnparsedPackets = 20;
-
     ++unparsedPackets_;
-    if (unparsedPackets_ > maxUnparsedPackets)
+    if (maxUnparsedPackets_ && unparsedPackets_ > maxUnparsedPackets_)
     {
+        CV_LOG_ERROR(NULL, "Maxium number of packets (" << maxUnparsedPackets_ << ") parsed without decoding a frame or reconfiguring the decoder, if reading from \
+            a live source consider initializing with VideoReaderInitParams::udpSource == true.");
         hasError_ = true;
         frameQueue_->endDecode();
         return false;
@@ -106,16 +111,40 @@ int CUDAAPI cv::cudacodec::detail::VideoParser::HandleVideoSequence(void* userDa
         format->coded_width   != thiz->videoDecoder_->frameWidth()  ||
         format->coded_height  != thiz->videoDecoder_->frameHeight() ||
         format->chroma_format != thiz->videoDecoder_->chromaFormat()||
-        format->bit_depth_luma_minus8 != thiz->videoDecoder_->nBitDepthMinus8())
+        format->bit_depth_luma_minus8 != thiz->videoDecoder_->nBitDepthMinus8() ||
+        format->min_num_decode_surfaces != thiz->videoDecoder_->nDecodeSurfaces())
     {
         FormatInfo newFormat;
-
         newFormat.codec = static_cast<Codec>(format->codec);
         newFormat.chromaFormat = static_cast<ChromaFormat>(format->chroma_format);
+        newFormat.nBitDepthMinus8 = format->bit_depth_luma_minus8;
+        newFormat.ulWidth = format->coded_width;
+        newFormat.ulHeight = format->coded_height;
         newFormat.width = format->coded_width;
         newFormat.height = format->coded_height;
-        newFormat.nBitDepthMinus8 = format->bit_depth_luma_minus8;
-
+        newFormat.displayArea = Rect(Point(format->display_area.left, format->display_area.top), Point(format->display_area.right, format->display_area.bottom));
+        newFormat.fps = format->frame_rate.numerator / static_cast<float>(format->frame_rate.denominator);
+        newFormat.ulNumDecodeSurfaces = min(!thiz->allowFrameDrop_ ? max(thiz->videoDecoder_->nDecodeSurfaces(), static_cast<int>(format->min_num_decode_surfaces)) :
+            format->min_num_decode_surfaces * 2, 32);
+        if (format->progressive_sequence)
+            newFormat.deinterlaceMode = Weave;
+        else
+            newFormat.deinterlaceMode = Adaptive;
+        int maxW = 0, maxH = 0;
+        // AV1 has max width/height of sequence in sequence header
+        if (format->codec == cudaVideoCodec_AV1 && format->seqhdr_data_length > 0)
+        {
+            CUVIDEOFORMATEX* vidFormatEx = (CUVIDEOFORMATEX*)format;
+            maxW = vidFormatEx->av1.max_width;
+            maxH = vidFormatEx->av1.max_height;
+        }
+        if (maxW < (int)format->coded_width)
+            maxW = format->coded_width;
+        if (maxH < (int)format->coded_height)
+            maxH = format->coded_height;
+        newFormat.ulMaxWidth = maxW;
+        newFormat.ulMaxHeight = maxH;
+        thiz->frameQueue_->init(newFormat.ulNumDecodeSurfaces);
         try
         {
             thiz->videoDecoder_->release();
@@ -123,12 +152,13 @@ int CUDAAPI cv::cudacodec::detail::VideoParser::HandleVideoSequence(void* userDa
         }
         catch (const cv::Exception&)
         {
+            CV_LOG_ERROR(NULL, "Attempt to reconfigure Nvidia decoder failed!");
             thiz->hasError_ = true;
             return false;
         }
     }
 
-    return true;
+    return thiz->videoDecoder_->nDecodeSurfaces();
 }
 
 int CUDAAPI cv::cudacodec::detail::VideoParser::HandlePictureDecode(void* userData, CUVIDPICPARAMS* picParams)
@@ -137,13 +167,13 @@ int CUDAAPI cv::cudacodec::detail::VideoParser::HandlePictureDecode(void* userDa
 
     thiz->unparsedPackets_ = 0;
 
-    bool isFrameAvailable = thiz->frameQueue_->waitUntilFrameAvailable(picParams->CurrPicIdx);
-
+    bool isFrameAvailable = thiz->frameQueue_->waitUntilFrameAvailable(picParams->CurrPicIdx, thiz->allowFrameDrop_);
     if (!isFrameAvailable)
         return false;
 
     if (!thiz->videoDecoder_->decodePicture(picParams))
     {
+        CV_LOG_ERROR(NULL, "Decoding failed!");
         thiz->hasError_ = true;
         return false;
     }
@@ -157,8 +187,8 @@ int CUDAAPI cv::cudacodec::detail::VideoParser::HandlePictureDisplay(void* userD
 
     thiz->unparsedPackets_ = 0;
 
-    thiz->frameQueue_->enqueue(picParams);
-
+    thiz->frameQueue_->enqueue(picParams, thiz->currentFramePackets);
+    thiz->currentFramePackets.clear();
     return true;
 }
 
