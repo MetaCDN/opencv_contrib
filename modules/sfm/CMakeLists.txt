@@ -9,17 +9,17 @@ find_package(Ceres QUIET)
 if(NOT Gflags_FOUND)  # Ceres find gflags on the own, so separate search isn't necessary
   find_package(Gflags QUIET)
 endif()
-if(NOT Glog_FOUND)  # Ceres find glog on the own, so separate search isn't necessary
+if(NOT (Glog_FOUND OR glog_FOUND))  # Ceres find glog on the own, so separate search isn't necessary
   find_package(Glog QUIET)
 endif()
 
-if(NOT Gflags_FOUND OR NOT Glog_FOUND)
+if(NOT Gflags_FOUND OR NOT (Glog_FOUND OR glog_FOUND))
   # try local search scripts
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
   if(NOT Gflags_FOUND)
     find_package(Gflags QUIET)
   endif()
-  if(NOT Glog_FOUND)
+  if(NOT (Glog_FOUND OR glog_FOUND))
     find_package(Glog QUIET)
   endif()
 endif()
@@ -29,6 +29,8 @@ if(NOT DEFINED GFLAGS_INCLUDE_DIRS AND DEFINED GFLAGS_INCLUDE_DIR)
 endif()
 if(NOT GFLAGS_LIBRARIES AND TARGET gflags::gflags)
   set(GFLAGS_LIBRARIES gflags::gflags)
+elseif(NOT GFLAGS_LIBRARIES AND TARGET gflags)
+  set(GFLAGS_LIBRARIES gflags)
 endif()
 if(NOT DEFINED GLOG_INCLUDE_DIRS AND DEFINED GLOG_INCLUDE_DIR)
   set(GLOG_INCLUDE_DIRS "${GLOG_INCLUDE_DIR}")
@@ -116,6 +118,11 @@ ocv_add_module(sfm
 )
 
 add_definitions(/DGLOG_NO_ABBREVIATED_SEVERITIES)  # avoid ERROR macro conflict in glog (ceres dependency)
+
+if(WIN32)
+  # Avoid error due to min/max being already defined as a macro
+  add_definitions(-DNOMINMAX)
+endif(WIN32)
 
 ocv_warnings_disable(CMAKE_CXX_FLAGS
   -Wundef
