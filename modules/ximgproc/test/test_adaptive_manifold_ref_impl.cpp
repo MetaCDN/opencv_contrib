@@ -145,9 +145,9 @@ using namespace cv::ximgproc;
     public:
         AdaptiveManifoldFilterRefImpl();
 
-        void filter(InputArray src, OutputArray dst, InputArray joint) CV_OVERRIDE;
+        void filter(InputArray src, OutputArray dst, InputArray joint);
 
-        void collectGarbage() CV_OVERRIDE;
+        void collectGarbage();
 
         inline double getSigmaS() const CV_OVERRIDE { return sigma_s_; }
         inline void setSigmaS(double val) CV_OVERRIDE { sigma_s_ = val; }
