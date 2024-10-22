@@ -247,6 +247,7 @@ void TRACK_alovImpl::loadDataset(const string &rootPath)
 void TRACK_alovImpl::loadDatasetAnnotatedOnly(const string &rootPath)
 {
     vector <int> datasetsLengths;
+    int currDatasetID = 0;
 
     printf("ALOV300++ Annotated Dataset Initialization...\n");
 
@@ -257,6 +258,7 @@ void TRACK_alovImpl::loadDatasetAnnotatedOnly(const string &rootPath)
         for (int k = 0; k < sectionSizes[i]; k++)
         {
             vector <Ptr<TRACK_alovObj> > objects;
+            currDatasetID++;
 
             //Open dataset's ground truth (annotation) file
             string annoPath = fullAnnoPath(rootPath, i, k);

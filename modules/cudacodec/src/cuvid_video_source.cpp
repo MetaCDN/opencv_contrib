@@ -76,8 +76,6 @@ cv::cudacodec::detail::CuvidVideoSource::CuvidVideoSource(const String& fname)
     format_.height = vidfmt.coded_height;
     format_.displayArea = Rect(Point(vidfmt.display_area.left, vidfmt.display_area.top), Point(vidfmt.display_area.right, vidfmt.display_area.bottom));
     format_.valid = true;
-    if (vidfmt.frame_rate.numerator != 0 && vidfmt.frame_rate.denominator != 0)
-        format_.fps = vidfmt.frame_rate.numerator / (double)vidfmt.frame_rate.denominator;
 }
 
 cv::cudacodec::detail::CuvidVideoSource::~CuvidVideoSource()
@@ -90,9 +88,10 @@ FormatInfo cv::cudacodec::detail::CuvidVideoSource::format() const
     return format_;
 }
 
-void cv::cudacodec::detail::CuvidVideoSource::updateFormat(const FormatInfo& videoFormat)
+void cv::cudacodec::detail::CuvidVideoSource::updateFormat(const int codedWidth, const int codedHeight)
 {
-    format_ = videoFormat;
+    format_.width = codedWidth;
+    format_.height = codedHeight;
     format_.valid = true;
 }
 
@@ -120,7 +119,7 @@ int CUDAAPI cv::cudacodec::detail::CuvidVideoSource::HandleVideoData(void* userD
 {
     CuvidVideoSource* thiz = static_cast<CuvidVideoSource*>(userData);
 
-    return thiz->parseVideoData(packet->payload, packet->payload_size, thiz->RawModeEnabled(), false, (packet->flags & CUVID_PKT_ENDOFSTREAM) != 0);
+    return thiz->parseVideoData(packet->payload, packet->payload_size, (packet->flags & CUVID_PKT_ENDOFSTREAM) != 0);
 }
 
 #endif // HAVE_NVCUVID

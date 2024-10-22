@@ -2,6 +2,9 @@
     "class_ignore_list" : [
         "SURF_CUDA"
     ],
+    "const_fix" : {
+        "PCTSignatures" : { "SimilarityFunction": { "GAUSSIAN": "SIMFUN_GAUSSIAN" } }
+    },
     "AdditionalImports" : {
         "*" : [ "\"xfeatures2d.hpp\"" ]
     },

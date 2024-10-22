@@ -40,23 +40,19 @@ the use of this software, even if advised of the possibility of such damage.
 #include <opencv2/highgui.hpp>
 #include <opencv2/aruco.hpp>
 #include <iostream>
-#include "aruco_samples_utility.hpp"
 
 using namespace std;
 using namespace cv;
 
 namespace {
 const char* about = "Basic marker detection";
-
-//! [aruco_detect_markers_keys]
 const char* keys  =
         "{d        |       | dictionary: DICT_4X4_50=0, DICT_4X4_100=1, DICT_4X4_250=2,"
         "DICT_4X4_1000=3, DICT_5X5_50=4, DICT_5X5_100=5, DICT_5X5_250=6, DICT_5X5_1000=7, "
         "DICT_6X6_50=8, DICT_6X6_100=9, DICT_6X6_250=10, DICT_6X6_1000=11, DICT_7X7_50=12,"
         "DICT_7X7_100=13, DICT_7X7_250=14, DICT_7X7_1000=15, DICT_ARUCO_ORIGINAL = 16,"
         "DICT_APRILTAG_16h5=17, DICT_APRILTAG_25h9=18, DICT_APRILTAG_36h10=19, DICT_APRILTAG_36h11=20}"
-        "{cd       |       | Input file with custom dictionary }"
-        "{v        |       | Input from video or image file, if ommited, input comes from camera }"
+        "{v        |       | Input from video file, if ommited, input comes from camera }"
         "{ci       | 0     | Camera id if input doesnt come from video (-v) }"
         "{c        |       | Camera intrinsic parameters. Needed for camera pose }"
         "{l        | 0.1   | Marker side length (in meters). Needed for correct scale in camera pose }"
@@ -65,8 +61,53 @@ const char* keys  =
         "{refine   |       | Corner refinement: CORNER_REFINE_NONE=0, CORNER_REFINE_SUBPIX=1,"
         "CORNER_REFINE_CONTOUR=2, CORNER_REFINE_APRILTAG=3}";
 }
-//! [aruco_detect_markers_keys]
 
+/**
+ */
+static bool readCameraParameters(string filename, Mat &camMatrix, Mat &distCoeffs) {
+    FileStorage fs(filename, FileStorage::READ);
+    if(!fs.isOpened())
+        return false;
+    fs["camera_matrix"] >> camMatrix;
+    fs["distortion_coefficients"] >> distCoeffs;
+    return true;
+}
+
+
+
+/**
+ */
+static bool readDetectorParameters(string filename, Ptr<aruco::DetectorParameters> &params) {
+    FileStorage fs(filename, FileStorage::READ);
+    if(!fs.isOpened())
+        return false;
+    fs["adaptiveThreshWinSizeMin"] >> params->adaptiveThreshWinSizeMin;
+    fs["adaptiveThreshWinSizeMax"] >> params->adaptiveThreshWinSizeMax;
+    fs["adaptiveThreshWinSizeStep"] >> params->adaptiveThreshWinSizeStep;
+    fs["adaptiveThreshConstant"] >> params->adaptiveThreshConstant;
+    fs["minMarkerPerimeterRate"] >> params->minMarkerPerimeterRate;
+    fs["maxMarkerPerimeterRate"] >> params->maxMarkerPerimeterRate;
+    fs["polygonalApproxAccuracyRate"] >> params->polygonalApproxAccuracyRate;
+    fs["minCornerDistanceRate"] >> params->minCornerDistanceRate;
+    fs["minDistanceToBorder"] >> params->minDistanceToBorder;
+    fs["minMarkerDistanceRate"] >> params->minMarkerDistanceRate;
+    fs["cornerRefinementMethod"] >> params->cornerRefinementMethod;
+    fs["cornerRefinementWinSize"] >> params->cornerRefinementWinSize;
+    fs["cornerRefinementMaxIterations"] >> params->cornerRefinementMaxIterations;
+    fs["cornerRefinementMinAccuracy"] >> params->cornerRefinementMinAccuracy;
+    fs["markerBorderBits"] >> params->markerBorderBits;
+    fs["perspectiveRemovePixelPerCell"] >> params->perspectiveRemovePixelPerCell;
+    fs["perspectiveRemoveIgnoredMarginPerCell"] >> params->perspectiveRemoveIgnoredMarginPerCell;
+    fs["maxErroneousBitsInBorderRate"] >> params->maxErroneousBitsInBorderRate;
+    fs["minOtsuStdDev"] >> params->minOtsuStdDev;
+    fs["errorCorrectionRate"] >> params->errorCorrectionRate;
+    return true;
+}
+
+
+
+/**
+ */
 int main(int argc, char *argv[]) {
     CommandLineParser parser(argc, argv, keys);
     parser.about(about);
@@ -76,14 +117,14 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    int dictionaryId = parser.get<int>("d");
     bool showRejected = parser.has("r");
     bool estimatePose = parser.has("c");
     float markerLength = parser.get<float>("l");
 
-    aruco::DetectorParameters detectorParams;
+    Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
     if(parser.has("dp")) {
-        FileStorage fs(parser.get<string>("dp"), FileStorage::READ);
-        bool readOk = detectorParams.readDetectorParameters(fs.root());
+        bool readOk = readDetectorParameters(parser.get<string>("dp"), detectorParams);
         if(!readOk) {
             cerr << "Invalid detector parameters file" << endl;
             return 0;
@@ -92,9 +133,9 @@ int main(int argc, char *argv[]) {
 
     if (parser.has("refine")) {
         //override cornerRefinementMethod read from config file
-        detectorParams.cornerRefinementMethod = parser.get<aruco::CornerRefineMethod>("refine");
+        detectorParams->cornerRefinementMethod = parser.get<int>("refine");
     }
-    std::cout << "Corner refinement method (0: None, 1: Subpixel, 2:contour, 3: AprilTag 2): " << (int)detectorParams.cornerRefinementMethod << std::endl;
+    std::cout << "Corner refinement method (0: None, 1: Subpixel, 2:contour, 3: AprilTag 2): " << detectorParams->cornerRefinementMethod << std::endl;
 
     int camId = parser.get<int>("ci");
 
@@ -108,23 +149,8 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    aruco::Dictionary dictionary = aruco::getPredefinedDictionary(0);
-    if (parser.has("d")) {
-        int dictionaryId = parser.get<int>("d");
-        dictionary = aruco::getPredefinedDictionary(aruco::PredefinedDictionaryType(dictionaryId));
-    }
-    else if (parser.has("cd")) {
-        FileStorage fs(parser.get<std::string>("cd"), FileStorage::READ);
-        bool readOk = dictionary.aruco::Dictionary::readDictionary(fs.root());
-        if(!readOk) {
-            std::cerr << "Invalid dictionary file" << std::endl;
-            return 0;
-        }
-    }
-    else {
-        std::cerr << "Dictionary not specified" << std::endl;
-        return 0;
-    }
+    Ptr<aruco::Dictionary> dictionary =
+        aruco::getPredefinedDictionary(aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
 
     Mat camMatrix, distCoeffs;
     if(estimatePose) {
@@ -134,7 +160,7 @@ int main(int argc, char *argv[]) {
             return 0;
         }
     }
-    aruco::ArucoDetector detector(dictionary, detectorParams);
+
     VideoCapture inputVideo;
     int waitTime;
     if(!video.empty()) {
@@ -148,13 +174,6 @@ int main(int argc, char *argv[]) {
     double totalTime = 0;
     int totalIterations = 0;
 
-    // Set coordinate system
-    cv::Mat objPoints(4, 1, CV_32FC3);
-    objPoints.ptr<Vec3f>(0)[0] = Vec3f(-markerLength/2.f, markerLength/2.f, 0);
-    objPoints.ptr<Vec3f>(0)[1] = Vec3f(markerLength/2.f, markerLength/2.f, 0);
-    objPoints.ptr<Vec3f>(0)[2] = Vec3f(markerLength/2.f, -markerLength/2.f, 0);
-    objPoints.ptr<Vec3f>(0)[3] = Vec3f(-markerLength/2.f, -markerLength/2.f, 0);
-
     while(inputVideo.grab()) {
         Mat image, imageCopy;
         inputVideo.retrieve(image);
@@ -163,19 +182,13 @@ int main(int argc, char *argv[]) {
 
         vector< int > ids;
         vector< vector< Point2f > > corners, rejected;
+        vector< Vec3d > rvecs, tvecs;
 
         // detect markers and estimate pose
-        detector.detectMarkers(image, corners, ids, rejected);
-
-        size_t  nMarkers = corners.size();
-        vector<Vec3d> rvecs(nMarkers), tvecs(nMarkers);
-
-        if(estimatePose && !ids.empty()) {
-            // Calculate pose for each marker
-            for (size_t  i = 0; i < nMarkers; i++) {
-                solvePnP(objPoints, corners.at(i), camMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
-            }
-        }
+        aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+        if(estimatePose && ids.size() > 0)
+            aruco::estimatePoseSingleMarkers(corners, markerLength, camMatrix, distCoeffs, rvecs,
+                                             tvecs);
 
         double currentTime = ((double)getTickCount() - tick) / getTickFrequency();
         totalTime += currentTime;
@@ -187,16 +200,17 @@ int main(int argc, char *argv[]) {
 
         // draw results
         image.copyTo(imageCopy);
-        if(!ids.empty()) {
+        if(ids.size() > 0) {
             aruco::drawDetectedMarkers(imageCopy, corners, ids);
 
             if(estimatePose) {
                 for(unsigned int i = 0; i < ids.size(); i++)
-                    cv::drawFrameAxes(imageCopy, camMatrix, distCoeffs, rvecs[i], tvecs[i], markerLength * 1.5f, 2);
+                    aruco::drawAxis(imageCopy, camMatrix, distCoeffs, rvecs[i], tvecs[i],
+                                    markerLength * 0.5f);
             }
         }
 
-        if(showRejected && !rejected.empty())
+        if(showRejected && rejected.size() > 0)
             aruco::drawDetectedMarkers(imageCopy, rejected, noArray(), Scalar(100, 0, 255));
 
         imshow("out", imageCopy);

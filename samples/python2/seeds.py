@@ -12,12 +12,15 @@ Usage:
 import numpy as np
 import cv2 as cv
 
+# relative module
+import video
+
 # built-in module
 import sys
 
 
 if __name__ == '__main__':
-    print(__doc__)
+    print __doc__
 
     try:
         fn = sys.argv[1]
@@ -38,7 +41,7 @@ if __name__ == '__main__':
     num_levels = 4
     num_histogram_bins = 5
 
-    cap = cv.VideoCapture(fn)
+    cap = video.create_capture(fn)
     while True:
         flag, img = cap.read()
         converted_img = cv.cvtColor(img, cv.COLOR_BGR2HSV)

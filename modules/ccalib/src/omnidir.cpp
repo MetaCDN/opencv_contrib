@@ -1782,14 +1782,12 @@ void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoint
 
     Mat sigma_x;
     meanStdDev(reprojError.reshape(1,1), noArray(), sigma_x);
+    sigma_x *= sqrt(2.0*(double)reprojError.total()/(2.0*(double)reprojError.total() - 1.0));
+    double s = sigma_x.at<double>(0);
 
     Mat _JTJ_inv, _JTE;
     computeJacobian(objectPoints, imagePoints, parameters, _JTJ_inv, _JTE, flags, 0.0);
     sqrt(_JTJ_inv, _JTJ_inv);
-
-    int nParams = _JTJ_inv.rows;
-    sigma_x *= sqrt(2.0*(double)reprojError.total()/(2.0*(double)reprojError.total() - nParams));
-    double s = sigma_x.at<double>(0);
 
     errors = 3 * s * _JTJ_inv.diag();
 
@@ -1870,14 +1868,12 @@ void cv::omnidir::internal::estimateUncertaintiesStereo(InputArrayOfArrays objec
 
     Mat sigma_x;
     meanStdDev(reprojErrorAll.reshape(1,1), noArray(), sigma_x);
+    sigma_x *= sqrt(2.0*(double)reprojErrorAll.total()/(2.0*(double)reprojErrorAll.total() - 1.0));
+    double s = sigma_x.at<double>(0);
 
     Mat _JTJ_inv, _JTE;
     computeJacobianStereo(objectPoints, imagePoints1, imagePoints2, _parameters, _JTJ_inv, _JTE, flags, 0.0);
     cv::sqrt(_JTJ_inv, _JTJ_inv);
-
-    int nParams = _JTJ_inv.rows;
-    sigma_x *= sqrt(2.0*(double)reprojErrorAll.total()/(2.0*(double)reprojErrorAll.total() - nParams));
-    double s = sigma_x.at<double>(0);
 
     errors = 3 * s * _JTJ_inv.diag();
 
@@ -2138,7 +2134,7 @@ void cv::omnidir::internal::flags2idxStereo(int flags, std::vector<int>& idx, in
     }
 }
 
-// fill in zeros for fixed parameters
+// fill in zerso for fixed parameters
 void cv::omnidir::internal::fillFixed(Mat&G, int flags, int n)
 {
     Mat tmp = G.clone();

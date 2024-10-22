@@ -56,51 +56,41 @@ public:
     virtual ~VideoSource() {}
 
     virtual FormatInfo format() const = 0;
-    virtual void updateFormat(const FormatInfo& videoFormat) = 0;
-    virtual bool get(const int propertyId, double& propertyVal) const { return false; }
+    virtual void updateFormat(const int codedWidth, const int codedHeight) = 0;
     virtual void start() = 0;
     virtual void stop() = 0;
     virtual bool isStarted() const = 0;
     virtual bool hasError() const = 0;
+
     void setVideoParser(detail::VideoParser* videoParser) { videoParser_ = videoParser; }
-    void setExtraData(const cv::Mat _extraData) {
-        AutoLock autoLock(mtx_);
-        extraData = _extraData.clone();
-    }
-    void getExtraData(cv::Mat& _extraData) {
-        AutoLock autoLock(mtx_);
-        _extraData = extraData.clone();
-    }
-    void SetRawMode(const bool enabled) { rawMode_ = enabled; }
-    bool RawModeEnabled() const { return rawMode_; }
+
 protected:
-    bool parseVideoData(const uchar* data, size_t size, const bool rawMode, const bool containsKeyFrame,  bool endOfStream = false);
-    bool extraDataQueried = false;
+    bool parseVideoData(const uchar* data, size_t size, bool endOfStream = false);
+
 private:
-    detail::VideoParser* videoParser_ = 0;
-    cv::Mat extraData;
-    bool rawMode_ = false;
-    Mutex mtx_;
+    detail::VideoParser* videoParser_;
 };
 
 class RawVideoSourceWrapper : public VideoSource
 {
 public:
-    RawVideoSourceWrapper(const Ptr<RawVideoSource>& source, const bool rawMode);
+    RawVideoSourceWrapper(const Ptr<RawVideoSource>& source);
 
     FormatInfo format() const CV_OVERRIDE;
-    void updateFormat(const FormatInfo& videoFormat) CV_OVERRIDE;
-    bool get(const int propertyId, double& propertyVal) const CV_OVERRIDE;
+    void updateFormat(const int codedWidth, const int codedHeight) CV_OVERRIDE;
     void start() CV_OVERRIDE;
     void stop() CV_OVERRIDE;
     bool isStarted() const CV_OVERRIDE;
     bool hasError() const CV_OVERRIDE;
+
 private:
-    static void readLoop(void* userData);
-    Ptr<RawVideoSource> source_ = 0;
-    Ptr<Thread> thread_ = 0;
+    Ptr<RawVideoSource> source_;
+
+    Ptr<Thread> thread_;
     volatile bool stop_;
     volatile bool hasError_;
+
+    static void readLoop(void* userData);
 };
 
 }}}

@@ -6,5 +6,5 @@ ocv_define_module(
     opencv_imgproc
     opencv_dnn
     OPTIONAL opencv_quality
-    WRAP python java
+    WRAP python
 )

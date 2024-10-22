@@ -314,10 +314,14 @@ private:
 
     NV_OF_CUDA_API_FUNCTION_LIST* GetAPI()
     {
+        std::lock_guard<std::mutex> lock(m_lock);
         return  m_ofAPI.get();
     }
 
     NvOFHandle GetHandle() { return m_hOF; }
+
+protected:
+    std::mutex m_lock;
 
 public:
     NvidiaOpticalFlowImpl(cv::Size imageSize, NV_OF_PERF_LEVEL perfPreset, bool bEnableTemporalHints,
@@ -334,8 +338,6 @@ public:
         int gridSize, InputOutputArray upsampledFlow);
 
     virtual int getGridSize() const { return m_gridSize; }
-
-    ~NvidiaOpticalFlowImpl();
 };
 
 NvidiaOpticalFlowImpl::NvidiaOpticalFlowImpl(
@@ -597,24 +599,20 @@ void NvidiaOpticalFlowImpl::collectGarbage()
     if (m_hInputBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hInputBuffer));
-        m_hInputBuffer = nullptr;
     }
     if (m_hReferenceBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hReferenceBuffer));
-        m_hReferenceBuffer = nullptr;
     }
     if (m_hOutputBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hOutputBuffer));
-        m_hOutputBuffer = nullptr;
     }
     if (m_enableExternalHints)
     {
         if (m_hHintBuffer)
         {
             NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hHintBuffer));
-            m_hHintBuffer = nullptr;
         }
     }
     if (m_enableCostBuffer)
@@ -622,7 +620,6 @@ void NvidiaOpticalFlowImpl::collectGarbage()
         if (m_hCostBuffer)
         {
             NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hCostBuffer));
-            m_hCostBuffer = nullptr;
         }
     }
     if (m_inputStream)
@@ -636,13 +633,7 @@ void NvidiaOpticalFlowImpl::collectGarbage()
     if (m_hOF)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroy(m_hOF));
-        m_hOF = nullptr;
     }
-}
-
-NvidiaOpticalFlowImpl::~NvidiaOpticalFlowImpl()
-{
-    collectGarbage();
 }
 
 void NvidiaOpticalFlowImpl::upSampler(InputArray _flow, cv::Size imageSize,
@@ -763,10 +754,14 @@ private:
 
     NV_OF_CUDA_API_FUNCTION_LIST* GetAPI()
     {
+        std::lock_guard<std::mutex> lock(m_lock);
         return  m_ofAPI.get();
     }
 
     NvOFHandle GetHandle() { return m_hOF; }
+
+protected:
+    std::mutex m_lock;
 
 public:
     NvidiaOpticalFlowImpl_2(cv::Size imageSize, NV_OF_PERF_LEVEL perfPreset,
@@ -783,8 +778,6 @@ public:
     virtual void convertToFloat(InputArray flow, InputOutputArray floatFlow);
 
     virtual int getGridSize() const { return m_gridSize; }
-
-    ~NvidiaOpticalFlowImpl_2();
 };
 
 NvidiaOpticalFlowImpl_2::NvidiaOpticalFlowImpl_2(
@@ -1156,29 +1149,24 @@ void NvidiaOpticalFlowImpl_2::collectGarbage()
     if (m_hInputBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hInputBuffer));
-        m_hInputBuffer = nullptr;
     }
     if (m_hReferenceBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hReferenceBuffer));
-        m_hReferenceBuffer = nullptr;
     }
     if (m_hOutputBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hOutputBuffer));
-        m_hOutputBuffer = nullptr;
     }
     if (m_scaleFactor > 1 && m_hOutputUpScaledBuffer)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hOutputUpScaledBuffer));
-        m_hOutputUpScaledBuffer = nullptr;
     }
     if (m_enableExternalHints)
     {
         if (m_hHintBuffer)
         {
             NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hHintBuffer));
-            m_hHintBuffer = nullptr;
         }
     }
     if (m_enableCostBuffer)
@@ -1186,7 +1174,6 @@ void NvidiaOpticalFlowImpl_2::collectGarbage()
         if (m_hCostBuffer)
         {
             NVOF_API_CALL(GetAPI()->nvOFDestroyGPUBufferCuda(m_hCostBuffer));
-            m_hCostBuffer = nullptr;
         }
     }
     if (m_inputStream)
@@ -1200,13 +1187,7 @@ void NvidiaOpticalFlowImpl_2::collectGarbage()
     if (m_hOF)
     {
         NVOF_API_CALL(GetAPI()->nvOFDestroy(m_hOF));
-        m_hOF = nullptr;
     }
-}
-
-NvidiaOpticalFlowImpl_2::~NvidiaOpticalFlowImpl_2()
-{
-    collectGarbage();
 }
 
 void NvidiaOpticalFlowImpl_2::convertToFloat(InputArray _flow, InputOutputArray floatFlow)

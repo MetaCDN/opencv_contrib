@@ -46,22 +46,41 @@ Explanation
 -----------
 
 -#  **Load source color image**
+    @code{.cpp}
+    cv::Mat image = cv::imread(inFilename, 1);
+    if ( image.empty() )
+    {
+        printf("Cannot read image file: %s\n", inFilename.c_str());
+        return -1;
+    }
+    @endcode
 
-    @snippet ximgproc/samples/structured_edge_detection.cpp imread
-
--#  **Convert source image to float [0;1] range**
-
-    @snippet ximgproc/samples/structured_edge_detection.cpp convert
+-#  **Convert source image to [0;1] range**
+    @code{.cpp}
+    image.convertTo(image, cv::DataType<float>::type, 1/255.0);
+    @endcode
 
 -#  **Run main algorithm**
+    @code{.cpp}
+    cv::Mat edges(image.size(), image.type());
 
-    @snippet ximgproc/samples/structured_edge_detection.cpp create
-    @snippet ximgproc/samples/structured_edge_detection.cpp detect
-    @snippet ximgproc/samples/structured_edge_detection.cpp nms
+    cv::Ptr<StructuredEdgeDetection> pDollar =
+        cv::createStructuredEdgeDetection(modelFilename);
+    pDollar->detectEdges(image, edges);
+    @endcode
 
 -#  **Show results**
+    @code{.cpp}
+    if ( outFilename == "" )
+    {
+        cv::namedWindow("edges", 1);
+        cv::imshow("edges", edges);
 
-    @snippet ximgproc/samples/structured_edge_detection.cpp imshow
+        cv::waitKey(0);
+    }
+    else
+        cv::imwrite(outFilename, 255*edges);
+    @endcode
 
 Literature
 ----------

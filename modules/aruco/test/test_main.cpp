@@ -3,6 +3,4 @@
 // of this distribution and at http://opencv.org/license.html.
 #include "test_precomp.hpp"
 
-CV_TEST_MAIN("cv",
-    cvtest::addDataSearchSubDirectory("contrib/aruco")
-)
+CV_TEST_MAIN("cv")

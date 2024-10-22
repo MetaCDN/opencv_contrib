@@ -388,7 +388,7 @@ static void convertInputArrayToRuns(InputArray& theArray, rlVec& runs, Size& the
 
 static void sortChords(rlVec& lChords)
 {
-    std::sort(lChords.begin(), lChords.end());
+    sort(lChords.begin(), lChords.end());
 }
 
 static void mergeNeighbouringChords(rlVec& rlIn, rlVec& rlOut)

@@ -162,9 +162,7 @@ namespace
         GpuMat p32_buf;
 
         GpuMat diff_buf;
-
-        GpuMat diff_sum_dev;
-        Mat diff_sum_host;
+        GpuMat norm_buf;
     };
 
     void OpticalFlowDual_TVL1_Impl::calc(InputArray _frame0, InputArray _frame1, InputOutputArray _flow, Stream& stream)
@@ -363,11 +361,8 @@ namespace
                 estimateU(I1wx, I1wy, grad, rho_c, p11, p12, p21, p22, p31, p32, u1, u2, u3, diff, l_t, static_cast<float>(theta_), gamma_, calcError, stream);
                 if (calcError)
                 {
-                    cuda::calcSum(diff, diff_sum_dev, cv::noArray(), _stream);
-                    diff_sum_dev.download(diff_sum_host, _stream);
                     _stream.waitForCompletion();
-
-                    error = diff_sum_host.at<double>(0,0);
+                    error = cuda::sum(diff, norm_buf)[0];
                     prevError = error;
                 }
                 else

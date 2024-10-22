@@ -74,12 +74,7 @@ public:
         { CV_Error(Error::StsNotImplemented, "Not implemented"); };
 
     virtual void fetchNormals(InputArray points, OutputArray _normals) const override;
-    void fetchPointsNormalsColors(OutputArray points, OutputArray normals, OutputArray colors) const override;
-
-    void fetchPointsNormals(OutputArray points, OutputArray normals) const override
-    {
-        fetchPointsNormalsColors(points, normals, noArray());
-    }
+    virtual void fetchPointsNormals(OutputArray points, OutputArray normals) const override;
 
     virtual void reset() override;
     virtual RGBTsdfVoxel at(const Vec3i& volumeIdx) const;
@@ -194,21 +189,21 @@ inline float ColoredTSDFVolumeCPU::interpolateVoxel(const v_float32x4& p) const
 {
     // tx, ty, tz = floor(p)
     v_int32x4 ip = v_floor(p);
-    v_float32x4 t = v_sub(p, v_cvt_f32(ip));
-    float tx = v_get0(t);
+    v_float32x4 t = p - v_cvt_f32(ip);
+    float tx = t.get0();
     t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-    float ty = v_get0(t);
+    float ty = t.get0();
     t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-    float tz = v_get0(t);
+    float tz = t.get0();
 
     int xdim = volDims[0], ydim = volDims[1], zdim = volDims[2];
     const RGBTsdfVoxel* volData = volume.ptr<RGBTsdfVoxel>();
 
-    int ix = v_get0(ip);
+    int ix = ip.get0();
     ip = v_rotate_right<1>(ip);
-    int iy = v_get0(ip);
+    int iy = ip.get0();
     ip = v_rotate_right<1>(ip);
-    int iz = v_get0(ip);
+    int iz = ip.get0();
 
     int coordBase = ix * xdim + iy * ydim + iz * zdim;
 
@@ -218,15 +213,15 @@ inline float ColoredTSDFVolumeCPU::interpolateVoxel(const v_float32x4& p) const
 
     v_float32x4 v0246 = tsdfToFloat_INTR(v_int32x4(vx[0], vx[2], vx[4], vx[6]));
     v_float32x4 v1357 = tsdfToFloat_INTR(v_int32x4(vx[1], vx[3], vx[5], vx[7]));
-    v_float32x4 vxx = v_add(v0246, v_mul(v_setall_f32(tz), v_sub(v1357, v0246)));
+    v_float32x4 vxx = v0246 + v_setall_f32(tz) * (v1357 - v0246);
 
     v_float32x4 v00_10 = vxx;
     v_float32x4 v01_11 = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(vxx)));
 
-    v_float32x4 v0_1 = v_add(v00_10, v_mul(v_setall_f32(ty), v_sub(v01_11, v00_10)));
-    float v0 = v_get0(v0_1);
+    v_float32x4 v0_1 = v00_10 + v_setall_f32(ty) * (v01_11 - v00_10);
+    float v0 = v0_1.get0();
     v0_1 = v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(v0_1)));
-    float v1 = v_get0(v0_1);
+    float v1 = v0_1.get0();
 
     return v0 + tx * (v1 - v0);
 }
@@ -276,27 +271,27 @@ inline Point3f ColoredTSDFVolumeCPU::getNormalVoxel(const Point3f& _p) const
 
 inline v_float32x4 ColoredTSDFVolumeCPU::getNormalVoxel(const v_float32x4& p) const
 {
-    if (v_check_any(v_lt(p, v_float32x4(1.f, 1.f, 1.f, 0.f))) ||
-        v_check_any(v_ge(p, v_float32x4((float)(volResolution.x - 2),
+    if (v_check_any(p < v_float32x4(1.f, 1.f, 1.f, 0.f)) ||
+        v_check_any(p >= v_float32x4((float)(volResolution.x - 2),
             (float)(volResolution.y - 2),
-            (float)(volResolution.z - 2), 1.f)))
+            (float)(volResolution.z - 2), 1.f))
         )
         return nanv;
 
     v_int32x4 ip = v_floor(p);
-    v_float32x4 t = v_sub(p, v_cvt_f32(ip));
-    float tx = v_get0(t);
+    v_float32x4 t = p - v_cvt_f32(ip);
+    float tx = t.get0();
     t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-    float ty = v_get0(t);
+    float ty = t.get0();
     t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-    float tz = v_get0(t);
+    float tz = t.get0();
 
     const int xdim = volDims[0], ydim = volDims[1], zdim = volDims[2];
     const RGBTsdfVoxel* volData = volume.ptr<RGBTsdfVoxel>();
 
-    int ix = v_get0(ip); ip = v_rotate_right<1>(ip);
-    int iy = v_get0(ip); ip = v_rotate_right<1>(ip);
-    int iz = v_get0(ip);
+    int ix = ip.get0(); ip = v_rotate_right<1>(ip);
+    int iy = ip.get0(); ip = v_rotate_right<1>(ip);
+    int iz = ip.get0();
 
     int coordBase = ix * xdim + iy * ydim + iz * zdim;
 
@@ -314,23 +309,23 @@ inline v_float32x4 ColoredTSDFVolumeCPU::getNormalVoxel(const v_float32x4& p) co
 
         v_float32x4 v0246(vx[0], vx[2], vx[4], vx[6]);
         v_float32x4 v1357(vx[1], vx[3], vx[5], vx[7]);
-        v_float32x4 vxx = v_add(v0246, v_mul(v_setall_f32(tz), v_sub(v1357, v0246)));
+        v_float32x4 vxx = v0246 + v_setall_f32(tz) * (v1357 - v0246);
 
         v_float32x4 v00_10 = vxx;
         v_float32x4 v01_11 = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(vxx)));
 
-        v_float32x4 v0_1 = v_add(v00_10, v_mul(v_setall_f32(ty), v_sub(v01_11, v00_10)));
-        float v0 = v_get0(v0_1);
+        v_float32x4 v0_1 = v00_10 + v_setall_f32(ty) * (v01_11 - v00_10);
+        float v0 = v0_1.get0();
         v0_1 = v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(v0_1)));
-        float v1 = v_get0(v0_1);
+        float v1 = v0_1.get0();
 
         nv = v0 + tx * (v1 - v0);
     }
 
     v_float32x4 n = v_load_aligned(an);
-    v_float32x4 Norm = v_sqrt(v_setall_f32(v_reduce_sum(v_mul(n, n))));
+    v_float32x4 Norm = v_sqrt(v_setall_f32(v_reduce_sum(n * n)));
 
-    return v_get0(Norm) < 0.0001f ? nanv : v_div(n, Norm);
+    return Norm.get0() < 0.0001f ? nanv : n / Norm;
 }
 #else
 inline Point3f ColoredTSDFVolumeCPU::getNormalVoxel(const Point3f& p) const
@@ -388,15 +383,15 @@ inline float ColoredTSDFVolumeCPU::interpolateColor(float tx, float ty, float tz
     v_float32x4 v0246, v1357;
     v_load_deinterleave(vx, v0246, v1357);
 
-    v_float32x4 vxx = v_add(v0246, v_mul(v_setall_f32(tz), v_sub(v1357, v0246)));
+    v_float32x4 vxx = v0246 + v_setall_f32(tz) * (v1357 - v0246);
 
     v_float32x4 v00_10 = vxx;
     v_float32x4 v01_11 = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(vxx)));
 
-    v_float32x4 v0_1 = v_add(v00_10, v_mul(v_setall_f32(ty), v_sub(v01_11, v00_10)));
-    float v0 = v_get0(v0_1);
+    v_float32x4 v0_1 = v00_10 + v_setall_f32(ty) * (v01_11 - v00_10);
+    float v0 = v0_1.get0();
     v0_1 = v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(v0_1)));
-    float v1 = v_get0(v0_1);
+    float v1 = v0_1.get0();
 
     return v0 + tx * (v1 - v0);
 }
@@ -427,10 +422,10 @@ inline Point3f ColoredTSDFVolumeCPU::getColorVoxel(const Point3f& _p) const
 }
 inline v_float32x4 ColoredTSDFVolumeCPU::getColorVoxel(const v_float32x4& p) const
 {
-    if (v_check_any(v_lt(p, v_float32x4(1.f, 1.f, 1.f, 0.f))) ||
-        v_check_any(v_ge(p, v_float32x4((float)(volResolution.x - 2),
+    if (v_check_any(p < v_float32x4(1.f, 1.f, 1.f, 0.f)) ||
+        v_check_any(p >= v_float32x4((float)(volResolution.x - 2),
             (float)(volResolution.y - 2),
-            (float)(volResolution.z - 2), 1.f)))
+            (float)(volResolution.z - 2), 1.f))
         )
         return nanv;
 
@@ -439,9 +434,9 @@ inline v_float32x4 ColoredTSDFVolumeCPU::getColorVoxel(const v_float32x4& p) con
     const int xdim = volDims[0], ydim = volDims[1], zdim = volDims[2];
     const RGBTsdfVoxel* volData = volume.ptr<RGBTsdfVoxel>();
 
-    int ix = v_get0(ip); ip = v_rotate_right<1>(ip);
-    int iy = v_get0(ip); ip = v_rotate_right<1>(ip);
-    int iz = v_get0(ip);
+    int ix = ip.get0(); ip = v_rotate_right<1>(ip);
+    int iy = ip.get0(); ip = v_rotate_right<1>(ip);
+    int iz = ip.get0();
 
     int coordBase = ix * xdim + iy * ydim + iz * zdim;
     float CV_DECL_ALIGNED(16) rgb[4];
@@ -456,12 +451,12 @@ inline v_float32x4 ColoredTSDFVolumeCPU::getColorVoxel(const v_float32x4& p) con
     }
 
     v_float32x4 vsi(voxelSizeInv, voxelSizeInv, voxelSizeInv, voxelSizeInv);
-    v_float32x4 ptVox = v_mul(p, vsi);
+    v_float32x4 ptVox = p * vsi;
     v_int32x4 iptVox = v_floor(ptVox);
-    v_float32x4 t = v_sub(ptVox, v_cvt_f32(iptVox));
-    float tx = v_get0(t); t = v_rotate_right<1>(t);
-    float ty = v_get0(t); t = v_rotate_right<1>(t);
-    float tz = v_get0(t);
+    v_float32x4 t = ptVox - v_cvt_f32(iptVox);
+    float tx = t.get0(); t = v_rotate_right<1>(t);
+    float ty = t.get0(); t = v_rotate_right<1>(t);
+    float tz = t.get0();
     rgb[0] = interpolateColor(tx, ty, tz, r);
     rgb[1] = interpolateColor(tx, ty, tz, g);
     rgb[2] = interpolateColor(tx, ty, tz, b);
@@ -583,21 +578,21 @@ struct ColorRaycastInvoker : ParallelLoopBody
                 // get direction through pixel in volume space:
 
                 // 1. reproject (x, y) on projecting plane where z = 1.f
-                v_float32x4 planed = v_mul(v_sub(v_float32x4((float)x, (float)y, 0.F, 0.F), vcxy), vfxy);
+                v_float32x4 planed = (v_float32x4((float)x, (float)y, 0.f, 0.f) - vcxy) * vfxy;
                 planed = v_combine_low(planed, v_float32x4(1.f, 0.f, 0.f, 0.f));
 
                 // 2. rotate to volume space
                 planed = v_matmuladd(planed, camRot0, camRot1, camRot2, v_setzero_f32());
 
                 // 3. normalize
-                v_float32x4 invNorm = v_invsqrt(v_setall_f32(v_reduce_sum(v_mul(planed, planed))));
-                v_float32x4 dir = v_mul(planed, invNorm);
+                v_float32x4 invNorm = v_invsqrt(v_setall_f32(v_reduce_sum(planed * planed)));
+                v_float32x4 dir = planed * invNorm;
 
                 // compute intersection of ray with all six bbox planes
-                v_float32x4 rayinv = v_div(v_setall_f32(1.F), dir);
+                v_float32x4 rayinv = v_setall_f32(1.f) / dir;
                 // div by zero should be eliminated by these products
-                v_float32x4 tbottom = v_mul(rayinv, v_sub(boxDown, orig));
-                v_float32x4 ttop = v_mul(rayinv, v_sub(boxUp, orig));
+                v_float32x4 tbottom = rayinv * (boxDown - orig);
+                v_float32x4 ttop = rayinv * (boxUp - orig);
 
                 // re-order intersections to find smallest and largest on each axis
                 v_float32x4 minAx = v_min(ttop, tbottom);
@@ -618,14 +613,14 @@ struct ColorRaycastInvoker : ParallelLoopBody
                 if (tmin < tmax)
                 {
                     // interpolation optimized a little
-                    orig = v_mul(orig, invVoxelSize);
-                    dir = v_mul(dir, invVoxelSize);
+                    orig *= invVoxelSize;
+                    dir *= invVoxelSize;
 
                     int xdim = volume.volDims[0];
                     int ydim = volume.volDims[1];
                     int zdim = volume.volDims[2];
-                    v_float32x4 rayStep = v_mul(dir, v_setall_f32(this->tstep));
-                    v_float32x4 next = (v_add(orig, v_mul(dir, v_setall_f32(tmin))));
+                    v_float32x4 rayStep = dir * v_setall_f32(tstep);
+                    v_float32x4 next = (orig + dir * v_setall_f32(tmin));
                     float f = volume.interpolateVoxel(next), fnext = f;
 
                     //raymarch
@@ -633,11 +628,11 @@ struct ColorRaycastInvoker : ParallelLoopBody
                     int nSteps = cvFloor((tmax - tmin) / tstep);
                     for (; steps < nSteps; steps++)
                     {
-                        next = v_add(next, rayStep);
+                        next += rayStep;
                         v_int32x4 ip = v_round(next);
-                        int ix = v_get0(ip); ip = v_rotate_right<1>(ip);
-                        int iy = v_get0(ip); ip = v_rotate_right<1>(ip);
-                        int iz = v_get0(ip);
+                        int ix = ip.get0(); ip = v_rotate_right<1>(ip);
+                        int iy = ip.get0(); ip = v_rotate_right<1>(ip);
+                        int iz = ip.get0();
                         int coord = ix * xdim + iy * ydim + iz * zdim;
 
                         fnext = tsdfToFloat(volume.volume.at<RGBTsdfVoxel>(coord).tsdf);
@@ -657,7 +652,7 @@ struct ColorRaycastInvoker : ParallelLoopBody
                     // linearly interpolate t between two f values
                     if (f > 0.f && fnext < 0.f)
                     {
-                        v_float32x4 tp = v_sub(next, rayStep);
+                        v_float32x4 tp = next - rayStep;
                         float ft = volume.interpolateVoxel(tp);
                         float ftdt = volume.interpolateVoxel(next);
                         float ts = tmin + tstep * (steps - ft / (ftdt - ft));
@@ -665,7 +660,7 @@ struct ColorRaycastInvoker : ParallelLoopBody
                         // avoid division by zero
                         if (!cvIsNaN(ts) && !cvIsInf(ts))
                         {
-                            v_float32x4 pv = (v_add(orig, v_mul(dir, v_setall_f32(ts))));
+                            v_float32x4 pv = (orig + dir * v_setall_f32(ts));
                             v_float32x4 nv = volume.getNormalVoxel(pv);
                             v_float32x4 cv = volume.getColorVoxel(pv);
 
@@ -675,7 +670,9 @@ struct ColorRaycastInvoker : ParallelLoopBody
                                 //convert pv and nv to camera space
                                 normal = v_matmuladd(nv, volRot0, volRot1, volRot2, v_setzero_f32());
                                 // interpolation optimized a little
-                                point = v_matmuladd(v_mul(pv, v_float32x4(this->volume.voxelSize, this->volume.voxelSize, this->volume.voxelSize, 1.F)),
+                                point = v_matmuladd(pv * v_float32x4(volume.voxelSize,
+                                    volume.voxelSize,
+                                    volume.voxelSize, 1.f),
                                     volRot0, volRot1, volRot2, volTrans);
                             }
                         }
@@ -840,20 +837,17 @@ struct ColorFetchPointsNormalsInvoker : ParallelLoopBody
     ColorFetchPointsNormalsInvoker(const ColoredTSDFVolumeCPU& _volume,
                               std::vector<std::vector<ptype>>& _pVecs,
                               std::vector<std::vector<ptype>>& _nVecs,
-                              std::vector<std::vector<ptype>>& _cVecs,
-                              bool _needNormals, bool _needColors) :
+                              bool _needNormals) :
         ParallelLoopBody(),
         vol(_volume),
         pVecs(_pVecs),
         nVecs(_nVecs),
-        cVecs(_cVecs),
-        needNormals(_needNormals),
-        needColors(_needColors)
+        needNormals(_needNormals)
     {
         volDataStart = vol.volume.ptr<RGBTsdfVoxel>();
     }
 
-    inline void coord(std::vector<ptype>& points, std::vector<ptype>& normals, std::vector<ptype>& colors,
+    inline void coord(std::vector<ptype>& points, std::vector<ptype>& normals,
                       int x, int y, int z, Point3f V, float v0, int axis) const
     {
         // 0 for x, 1 for y, 2 for z
@@ -903,8 +897,6 @@ struct ColorFetchPointsNormalsInvoker : ParallelLoopBody
                         if(needNormals)
                             normals.push_back(toPtype(vol.pose.rotation() *
                                                       vol.getNormalVoxel(p*vol.voxelSizeInv)));
-                        if(needColors)
-                            colors.push_back(toPtype(vol.getColorVoxel(p*vol.voxelSizeInv)));
                     }
                 }
             }
@@ -913,7 +905,7 @@ struct ColorFetchPointsNormalsInvoker : ParallelLoopBody
 
     virtual void operator() (const Range& range) const override
     {
-        std::vector<ptype> points, normals, colors;
+        std::vector<ptype> points, normals;
         for(int x = range.start; x < range.end; x++)
         {
             const RGBTsdfVoxel* volDataX = volDataStart + x*vol.volDims[0];
@@ -928,9 +920,9 @@ struct ColorFetchPointsNormalsInvoker : ParallelLoopBody
                     {
                         Point3f V(Point3f((float)x + 0.5f, (float)y + 0.5f, (float)z + 0.5f)*vol.voxelSize);
 
-                        coord(points, normals, colors, x, y, z, V, v0, 0);
-                        coord(points, normals, colors, x, y, z, V, v0, 1);
-                        coord(points, normals, colors, x, y, z, V, v0, 2);
+                        coord(points, normals, x, y, z, V, v0, 0);
+                        coord(points, normals, x, y, z, V, v0, 1);
+                        coord(points, normals, x, y, z, V, v0, 2);
 
                     } // if voxel is not empty
                 }
@@ -940,36 +932,32 @@ struct ColorFetchPointsNormalsInvoker : ParallelLoopBody
         AutoLock al(mutex);
         pVecs.push_back(points);
         nVecs.push_back(normals);
-        cVecs.push_back(colors);
     }
 
     const ColoredTSDFVolumeCPU& vol;
     std::vector<std::vector<ptype>>& pVecs;
     std::vector<std::vector<ptype>>& nVecs;
-    std::vector<std::vector<ptype>>& cVecs;
     const RGBTsdfVoxel* volDataStart;
     bool needNormals;
-    bool needColors;
     mutable Mutex mutex;
 };
 
-void ColoredTSDFVolumeCPU::fetchPointsNormalsColors(OutputArray _points, OutputArray _normals, OutputArray _colors) const
+void ColoredTSDFVolumeCPU::fetchPointsNormals(OutputArray _points, OutputArray _normals) const
 {
     CV_TRACE_FUNCTION();
 
     if(_points.needed())
     {
-        std::vector<std::vector<ptype>> pVecs, nVecs, cVecs;
-        ColorFetchPointsNormalsInvoker fi(*this, pVecs, nVecs, cVecs, _normals.needed(), _colors.needed());
+        std::vector<std::vector<ptype>> pVecs, nVecs;
+        ColorFetchPointsNormalsInvoker fi(*this, pVecs, nVecs, _normals.needed());
         Range range(0, volResolution.x);
         const int nstripes = -1;
         parallel_for_(range, fi, nstripes);
-        std::vector<ptype> points, normals, colors;
+        std::vector<ptype> points, normals;
         for(size_t i = 0; i < pVecs.size(); i++)
         {
             points.insert(points.end(), pVecs[i].begin(), pVecs[i].end());
             normals.insert(normals.end(), nVecs[i].begin(), nVecs[i].end());
-            colors.insert(colors.end(), cVecs[i].begin(), cVecs[i].end());
         }
 
         _points.create((int)points.size(), 1, POINT_TYPE);
@@ -981,13 +969,6 @@ void ColoredTSDFVolumeCPU::fetchPointsNormalsColors(OutputArray _points, OutputA
             _normals.create((int)normals.size(), 1, POINT_TYPE);
             if(!normals.empty())
                 Mat((int)normals.size(), 1, POINT_TYPE, &normals[0]).copyTo(_normals.getMat());
-        }
-
-        if(_colors.needed())
-        {
-            _colors.create((int)colors.size(), 1, COLOR_TYPE);
-            if(!colors.empty())
-                Mat((int)colors.size(), 1, COLOR_TYPE, &colors[0]).copyTo(_colors.getMat());
         }
     }
 }

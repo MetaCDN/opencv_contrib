@@ -30,21 +30,14 @@ struct ABWLParams
 {
     int x1, y1, x2, y2, boxRadius, th;
 };
-// Same as previous with floating point threshold
-struct ABWLParamsFloatTh
-{
-    int x1, y1, x2, y2, boxRadius;
-    float th;
-};
 
 // BEBLID implementation
-template <class WeakLearnerT>
 class BEBLID_Impl CV_FINAL: public BEBLID
 {
 public:
 
     // constructor
-    explicit BEBLID_Impl(float scale_factor, const std::vector<WeakLearnerT>& wl_params);
+    explicit BEBLID_Impl(float scale_factor, int n_bits = SIZE_512_BITS);
 
     // destructor
     ~BEBLID_Impl() CV_OVERRIDE = default;
@@ -58,71 +51,18 @@ public:
     // returns the default norm type
     int defaultNorm() const CV_OVERRIDE { return cv::NORM_HAMMING;  }
 
-    void setScaleFactor(float scale_factor) CV_OVERRIDE { scale_factor_ = scale_factor; }
-    float getScaleFactor() const { return scale_factor_;}
-
     // compute descriptors given keypoints
     void compute(InputArray image, vector<KeyPoint> &keypoints, OutputArray descriptors) CV_OVERRIDE;
 
 private:
-    std::vector<WeakLearnerT> wl_params_;
+    std::vector<ABWLParams> wl_params_;
     float scale_factor_;
     cv::Size patch_size_;
 
-    void computeBoxDiffsDescriptor(const cv::Mat &integralImg,
-                                   const std::vector<cv::KeyPoint> &keypoints,
-                                   cv::Mat &descriptors);
+    void computeBEBLID(const cv::Mat &integralImg,
+                       const std::vector<cv::KeyPoint> &keypoints,
+                       cv::Mat &descriptors);
 }; // END BEBLID_Impl CLASS
-
-
-// TEBLID implementation
-class TEBLID_Impl CV_FINAL: public TEBLID
-{
-public:
-
-    // constructor
-    explicit TEBLID_Impl(float scale_factor, const std::vector<ABWLParamsFloatTh>& wl_params) :
-        impl(scale_factor, wl_params){}
-
-    // destructor
-    ~TEBLID_Impl() CV_OVERRIDE = default;
-
-    // returns the descriptor length in bytes
-    int descriptorSize() const CV_OVERRIDE { return impl.descriptorSize(); }
-
-    // returns the descriptor type
-    int descriptorType() const CV_OVERRIDE { return impl.descriptorType(); }
-
-    // returns the default norm type
-    int defaultNorm() const CV_OVERRIDE { return impl.defaultNorm();  }
-
-    // compute descriptors given keypoints
-    void compute(InputArray image, vector<KeyPoint> &keypoints, OutputArray descriptors) CV_OVERRIDE
-    {
-        impl.compute(image, keypoints, descriptors);
-    }
-
-private:
-    BEBLID_Impl<ABWLParamsFloatTh> impl;
-}; // END TEBLID_Impl CLASS
-
-Ptr<TEBLID> TEBLID::create(float scale_factor, int n_bits)
-{
-    if (n_bits == TEBLID::SIZE_512_BITS)
-    {
-        #include "teblid.p512.hpp"
-        return makePtr<TEBLID_Impl>(scale_factor, teblid_wl_params_512);
-    }
-    else if(n_bits == TEBLID::SIZE_256_BITS)
-    {
-        #include "teblid.p256.hpp"
-        return makePtr<TEBLID_Impl>(scale_factor, teblid_wl_params_256);
-    }
-    else
-    {
-        CV_Error(Error::StsBadArg, "n_bits should be either TEBLID::SIZE_512_BITS or TEBLID::SIZE_256_BITS");
-    }
-}
 
 /**
  * @brief Function that determines if a keypoint is close to the image border.
@@ -160,9 +100,8 @@ static inline bool isKeypointInTheBorder(const cv::KeyPoint &kp,
  * @param scaleFactor A scale factor that magnifies the measurement functions w.r.t. the keypoint.
  * @param patchSize The size of the normalized patch where the measurement functions were learnt.
  */
-template< typename WeakLearnerT>
-static inline void rectifyABWL(const std::vector<WeakLearnerT> &wlPatchParams,
-                               std::vector<WeakLearnerT> &wlImageParams,
+static inline void rectifyABWL(const std::vector<ABWLParams> &wlPatchParams,
+                               std::vector<ABWLParams> &wlImageParams,
                                const cv::KeyPoint &kp,
                                float scaleFactor = 1,
                                const cv::Size &patchSize = cv::Size(32, 32))
@@ -212,8 +151,7 @@ static inline void rectifyABWL(const std::vector<WeakLearnerT> &wlPatchParams,
  * @param integralImage The integral image used to compute the average gray value in the square regions.
  * @return The difference of gray level in the two squares defined by wlImageParams
  */
-template <typename WeakLearnerT>
-static inline float computeABWLResponse(const WeakLearnerT &wlImageParams,
+static inline float computeABWLResponse(const ABWLParams &wlImageParams,
                                         const cv::Mat &integralImage)
 {
     CV_DbgAssert(!integralImage.empty());
@@ -301,8 +239,7 @@ static inline float computeABWLResponse(const WeakLearnerT &wlImageParams,
 }
 
 // descriptor computation using keypoints
-template <class WeakLearnerT>
-void BEBLID_Impl<WeakLearnerT>::compute(InputArray _image, vector<KeyPoint> &keypoints, OutputArray _descriptors)
+void BEBLID_Impl::compute(InputArray _image, vector<KeyPoint> &keypoints, OutputArray _descriptors)
 {
     Mat image = _image.getMat();
 
@@ -344,21 +281,27 @@ void BEBLID_Impl<WeakLearnerT>::compute(InputArray _image, vector<KeyPoint> &key
     CV_DbgAssert(descriptors.type() == CV_8UC1);
 
     // Compute the BEBLID descriptors
-    computeBoxDiffsDescriptor(integralImg, keypoints, descriptors);
+    computeBEBLID(integralImg, keypoints, descriptors);
 }
 
 // constructor
-template <class WeakLearnerT>
-BEBLID_Impl<WeakLearnerT>::BEBLID_Impl(float scale_factor, const std::vector<WeakLearnerT>& wl_params)
-    :  wl_params_(wl_params), scale_factor_(scale_factor), patch_size_(32, 32)
+BEBLID_Impl::BEBLID_Impl(float scale_factor, int n_bits)
+    : scale_factor_(scale_factor), patch_size_(32, 32)
 {
+    #include "beblid.p512.hpp"
+    #include "beblid.p256.hpp"
+    if (n_bits == SIZE_512_BITS)
+        wl_params_.assign(wl_params_512, wl_params_512 + sizeof(wl_params_512) / sizeof(wl_params_512[0]));
+    else if(n_bits == SIZE_256_BITS)
+        wl_params_.assign(wl_params_256, wl_params_256 + sizeof(wl_params_256) / sizeof(wl_params_256[0]));
+    else
+        CV_Error(Error::StsBadArg, "n_wls should be either SIZE_512_BITS or SIZE_256_BITS");
 }
 
 // Internal function that implements the core of BEBLID descriptor
-template<class WeakLearnerT>
-void BEBLID_Impl<WeakLearnerT>::computeBoxDiffsDescriptor(const cv::Mat &integralImg,
-                                                          const std::vector<cv::KeyPoint> &keypoints,
-                                                          cv::Mat &descriptors)
+void BEBLID_Impl::computeBEBLID(const cv::Mat &integralImg,
+                                const std::vector<cv::KeyPoint> &keypoints,
+                                cv::Mat &descriptors)
 {
     CV_DbgAssert(!integralImg.empty());
     CV_DbgAssert(size_t(descriptors.rows) == keypoints.size());
@@ -373,13 +316,13 @@ void BEBLID_Impl<WeakLearnerT>::computeBoxDiffsDescriptor(const cv::Mat &integra
 #endif
     {
         // Get a pointer to the first element in the range
-        WeakLearnerT *wl;
+        ABWLParams *wl;
         float responseFun;
         int areaResponseFun, kpIdx;
         size_t wlIdx;
         int box1x1, box1y1, box1x2, box1y2, box2x1, box2y1, box2x2, box2y2, bit_idx, side;
         uchar byte = 0;
-        std::vector<WeakLearnerT> imgWLParams(wl_params_.size());
+        std::vector<ABWLParams> imgWLParams(wl_params_.size());
         uchar *d = &descriptors.at<uchar>(range.start, 0);
 
         for (kpIdx = range.start; kpIdx < range.end; kpIdx++)
@@ -454,31 +397,7 @@ void BEBLID_Impl<WeakLearnerT>::computeBoxDiffsDescriptor(const cv::Mat &integra
 
 Ptr<BEBLID> BEBLID::create(float scale_factor, int n_bits)
 {
-    if (n_bits == BEBLID::SIZE_512_BITS)
-    {
-        #include "beblid.p512.hpp"
-        return makePtr<BEBLID_Impl<ABWLParams>>(scale_factor, beblid_wl_params_512);
-    }
-    else if(n_bits == BEBLID::SIZE_256_BITS)
-    {
-        #include "beblid.p256.hpp"
-        return makePtr<BEBLID_Impl<ABWLParams>>(scale_factor, beblid_wl_params_256);
-    }
-    else
-    {
-        CV_Error(Error::StsBadArg, "n_bits should be either BEBLID::SIZE_512_BITS or BEBLID::SIZE_256_BITS");
-    }
+    return makePtr<BEBLID_Impl>(scale_factor, n_bits);
 }
-
-String BEBLID::getDefaultName() const
-{
-  return (Feature2D::getDefaultName() + ".BEBLID");
-}
-
-String TEBLID::getDefaultName() const
-{
-  return (Feature2D::getDefaultName() + ".TEBLID");
-}
-
 } // END NAMESPACE XFEATURES2D
 } // END NAMESPACE CV
