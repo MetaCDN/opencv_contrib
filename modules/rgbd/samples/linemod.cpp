@@ -191,7 +191,7 @@ int main(int argc, char * argv[])
   int num_modalities = (int)detector->getModalities().size();
 
   // Open Kinect sensor
-  cv::VideoCapture capture( cv::CAP_OPENNI2 );
+  cv::VideoCapture capture( cv::CAP_OPENNI );
   if (!capture.isOpened())
   {
     printf("Could not open OpenNI-capable sensor\n");

@@ -54,10 +54,10 @@ class MLEScorer {
   double threshold_;
 };
 
-static unsigned int IterationsRequired(int min_samples,
+static uint IterationsRequired(int min_samples,
                         double outliers_probability,
                         double inlier_ratio) {
-  return static_cast<unsigned int>(
+  return static_cast<uint>(
       log(outliers_probability) / log(1.0 - pow(inlier_ratio, min_samples)));
 }
 

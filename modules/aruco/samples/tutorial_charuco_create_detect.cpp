@@ -4,26 +4,39 @@
 #include <opencv2/highgui.hpp>
 #include <iostream>
 #include <string>
-#include "aruco_samples_utility.hpp"
 
 namespace {
 const char* about = "A tutorial code on charuco board creation and detection of charuco board with and without camera caliberation";
 const char* keys = "{c        |       | Put value of c=1 to create charuco board;\nc=2 to detect charuco board without camera calibration;\nc=3 to detect charuco board with camera calibration and Pose Estimation}";
 }
 
-static inline void createBoard()
+void createBoard();
+void detectCharucoBoardWithCalibrationPose();
+void detectCharucoBoardWithoutCalibration();
+
+static bool readCameraParameters(std::string filename, cv::Mat& camMatrix, cv::Mat& distCoeffs)
 {
-    cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+    cv::FileStorage fs(filename, cv::FileStorage::READ);
+    if (!fs.isOpened())
+        return false;
+    fs["camera_matrix"] >> camMatrix;
+    fs["distortion_coefficients"] >> distCoeffs;
+    return (camMatrix.size() == cv::Size(3,3)) ;
+}
+
+void createBoard()
+{
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
     //! [createBoard]
-    cv::aruco::CharucoBoard board(cv::Size(5, 7), 0.04f, 0.02f, dictionary);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
     cv::Mat boardImage;
-    board.generateImage(cv::Size(600, 500), boardImage, 10, 1);
+    board->draw(cv::Size(600, 500), boardImage, 10, 1);
     //! [createBoard]
     cv::imwrite("BoardImage.jpg", boardImage);
 }
 
 //! [detwcp]
-static inline void detectCharucoBoardWithCalibrationPose()
+void detectCharucoBoardWithCalibrationPose()
 {
     cv::VideoCapture inputVideo;
     inputVideo.open(0);
@@ -36,9 +49,9 @@ static inline void detectCharucoBoardWithCalibrationPose()
         std::cerr << "Invalid camera file" << std::endl;
     } else {
         //! [dictboard]
-        cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-        cv::Ptr<cv::aruco::CharucoBoard> board = new cv::aruco::CharucoBoard(cv::Size(5, 7), 0.04f, 0.02f, dictionary);
-        cv::Ptr<cv::aruco::DetectorParameters> params = cv::makePtr<cv::aruco::DetectorParameters>();
+        cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+        cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
+        cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
         //! [dictboard]
         while (inputVideo.grab()) {
             //! [inputImg]
@@ -50,7 +63,7 @@ static inline void detectCharucoBoardWithCalibrationPose()
             //! [midcornerdet]
             std::vector<int> markerIds;
             std::vector<std::vector<cv::Point2f> > markerCorners;
-            cv::aruco::detectMarkers(image, cv::makePtr<cv::aruco::Dictionary>(board->getDictionary()), markerCorners, markerIds, params);
+            cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
             //! [midcornerdet]
             // if at least one marker detected
             if (markerIds.size() > 0) {
@@ -68,11 +81,12 @@ static inline void detectCharucoBoardWithCalibrationPose()
                     //! [detcor]
                     cv::Vec3d rvec, tvec;
                     //! [pose]
-                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
+                    // cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                     //! [pose]
+                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                     // if charuco pose is valid
                     if (valid)
-                        cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvec, tvec, 0.1f);
+                        cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvec, tvec, 0.1f);
                 }
             }
             cv::imshow("out", imageCopy);
@@ -85,14 +99,14 @@ static inline void detectCharucoBoardWithCalibrationPose()
 //! [detwcp]
 
 //! [detwc]
-static inline void detectCharucoBoardWithoutCalibration()
+void detectCharucoBoardWithoutCalibration()
 {
     cv::VideoCapture inputVideo;
     inputVideo.open(0);
-    cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-    cv::Ptr<cv::aruco::CharucoBoard> board = new cv::aruco::CharucoBoard(cv::Size(5, 7), 0.04f, 0.02f, dictionary);
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
 
-    cv::Ptr<cv::aruco::DetectorParameters> params = cv::makePtr<cv::aruco::DetectorParameters>();
+    cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
     params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;
     while (inputVideo.grab()) {
         cv::Mat image, imageCopy;
@@ -100,7 +114,7 @@ static inline void detectCharucoBoardWithoutCalibration()
         image.copyTo(imageCopy);
         std::vector<int> markerIds;
         std::vector<std::vector<cv::Point2f> > markerCorners;
-        cv::aruco::detectMarkers(image, cv::makePtr<cv::aruco::Dictionary>(board->getDictionary()), markerCorners, markerIds, params);
+        cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
         //or
         //cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds, params);
         // if at least one marker detected

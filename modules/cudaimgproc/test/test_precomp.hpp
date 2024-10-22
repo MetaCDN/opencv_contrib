@@ -49,6 +49,4 @@
 
 #include "cvconfig.h"
 
-#include <thread>
-
 #endif

@@ -99,8 +99,7 @@ CUDA_TEST_P(CUDA_SURF, Detector)
     std::vector<cv::KeyPoint> keypoints_gold;
     surf_gold->detect(image, keypoints_gold);
 
-    int lengthDiff = abs((int)keypoints_gold.size()) - ((int)keypoints.size());
-    EXPECT_LE(lengthDiff, 1);
+    ASSERT_EQ(keypoints_gold.size(), keypoints.size());
     int matchedCount = getMatchedPointsCount(keypoints_gold, keypoints);
     double matchedRatio = static_cast<double>(matchedCount) / keypoints_gold.size();
 
@@ -131,8 +130,7 @@ CUDA_TEST_P(CUDA_SURF, Detector_Masked)
     std::vector<cv::KeyPoint> keypoints_gold;
     surf_gold->detect(image, keypoints_gold, mask);
 
-    int lengthDiff = abs((int)keypoints_gold.size()) - ((int)keypoints.size());
-    EXPECT_LE(lengthDiff, 1);
+    ASSERT_EQ(keypoints_gold.size(), keypoints.size());
     int matchedCount = getMatchedPointsCount(keypoints_gold, keypoints);
     double matchedRatio = static_cast<double>(matchedCount) / keypoints_gold.size();
 
@@ -173,11 +171,19 @@ CUDA_TEST_P(CUDA_SURF, Descriptor)
     EXPECT_GT(matchedRatio, 0.6);
 }
 
+#if defined (__x86_64__) || defined (_M_X64)
 testing::internal::ValueArray3<SURF_HessianThreshold, SURF_HessianThreshold, SURF_HessianThreshold> thresholdValues =
     testing::Values(
             SURF_HessianThreshold(100.0),
             SURF_HessianThreshold(500.0),
             SURF_HessianThreshold(1000.0));
+#else
+// hessian computation is not bit-exact and lower threshold causes different count of detection
+testing::internal::ValueArray2<SURF_HessianThreshold, SURF_HessianThreshold> thresholdValues =
+    testing::Values(
+            SURF_HessianThreshold(830.0),
+            SURF_HessianThreshold(1000.0));
+#endif
 
 INSTANTIATE_TEST_CASE_P(CUDA_Features2D, CUDA_SURF, testing::Combine(
     thresholdValues,

@@ -168,10 +168,12 @@ static SceneNode& _getSceneNode(SceneManager* sceneMgr, const String& name)
     return *mo->getParentSceneNode();
 }
 
-/// BGR to RGB 0..1
 static ColourValue convertColor(const Scalar& val)
 {
-    return ColourValue(val[2], val[1], val[0]).saturateCopy();
+    // BGR 0..255 (uchar) to RGB 0..1
+    ColourValue ret = ColourValue(val[2], val[1], val[0]) / 255;
+    ret.saturate();
+    return ret;
 }
 
 class WindowSceneImpl;
@@ -443,22 +445,14 @@ public:
 
         _createTexture(name, image.getMat());
 
-        // ensure bgplane is visible
-        bgplane->setVisible(true);
         bgplane->setDefaultUVs();
 
-        Pass* rpass = bgplane->getMaterial()->getTechnique(0)->getPasses()[0];
-        auto tus = rpass->getTextureUnitStates()[0];
+        Pass* rpass = bgplane->getMaterial()->getBestTechnique()->getPasses()[0];
+        rpass->getTextureUnitStates()[0]->setTextureName(name);
+        rpass->getTextureUnitStates()[0]->setTextureAddressingMode(TAM_CLAMP);
 
-        if(tus->getTextureName() != name)
-        {
-            RTShader::ShaderGenerator::getSingleton().invalidateMaterial(
-                RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME, bgplane->getMaterial()->getName(),
-                RESOURCEGROUP_NAME);
-
-            tus->setTextureName(name);
-            tus->setTextureAddressingMode(TAM_CLAMP);
-        }
+        // ensure bgplane is visible
+        bgplane->setVisible(true);
     }
 
     void setCompositors(const std::vector<String>& names) CV_OVERRIDE
@@ -620,8 +614,9 @@ public:
                            const Scalar& specularColour) CV_OVERRIDE
     {
         Light* light = sceneMgr->createLight(name);
-        light->setDiffuseColour(convertColor(diffuseColour));
-        light->setSpecularColour(convertColor(specularColour));
+        // convert to BGR
+        light->setDiffuseColour(ColourValue(diffuseColour[2], diffuseColour[1], diffuseColour[0]));
+        light->setSpecularColour(ColourValue(specularColour[2], specularColour[1], specularColour[0]));
 
         Quaternion q;
         Vector3 t;

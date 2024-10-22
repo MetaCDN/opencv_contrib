@@ -68,18 +68,6 @@ namespace cv
             virtual void read( const FileNode& ) CV_OVERRIDE;
             virtual void write( FileStorage& ) const CV_OVERRIDE;
 
-            void setBytes(int bytes) CV_OVERRIDE;
-            int getBytes() const CV_OVERRIDE { return bytes_; }
-
-            void setRotationInvariance(bool rotationInvariance) CV_OVERRIDE { rotationInvariance_ = rotationInvariance; }
-            bool getRotationInvariance() const CV_OVERRIDE { return rotationInvariance_; }
-
-            void setHalfSSDsize(int half_ssd_size) CV_OVERRIDE { half_ssd_size_ = half_ssd_size; }
-            int getHalfSSDsize() const CV_OVERRIDE { return half_ssd_size_; }
-
-            void setSigma(double sigma) CV_OVERRIDE { sigma_ = sigma; }
-            double getSigma() const CV_OVERRIDE { return sigma_; }
-
             virtual int descriptorSize() const CV_OVERRIDE;
             virtual int descriptorType() const CV_OVERRIDE;
             virtual int defaultNorm() const CV_OVERRIDE;
@@ -102,10 +90,6 @@ namespace cv
         Ptr<LATCH> LATCH::create(int bytes, bool rotationInvariance, int half_ssd_size, double sigma)
         {
             return makePtr<LATCHDescriptorExtractorImpl>(bytes, rotationInvariance, half_ssd_size, sigma);
-        }
-        String LATCH::getDefaultName() const
-        {
-            return (Feature2D::getDefaultName() + ".LATCH");
         }
         void CalcuateSums(int count, const std::vector<int> &points, bool rotationInvariance, const Mat &grayImage, const KeyPoint &pt, int &suma, int &sumc, float cos_theta, float sin_theta, int half_ssd_size);
 
@@ -420,42 +404,37 @@ namespace cv
 
 
 
-        void LATCHDescriptorExtractorImpl::setBytes(int bytes)
-        {
-          switch (bytes)
-          {
-          case 1:
-              test_fn_ = pixelTests1;
-              break;
-          case 2:
-              test_fn_ = pixelTests2;
-              break;
-          case 4:
-              test_fn_ = pixelTests4;
-              break;
-          case 8:
-              test_fn_ = pixelTests8;
-              break;
-          case 16:
-              test_fn_ = pixelTests16;
-              break;
-          case 32:
-              test_fn_ = pixelTests32;
-              break;
-          case 64:
-              test_fn_ = pixelTests64;
-              break;
-          default:
-              CV_Error(Error::StsBadArg, "descriptorSize must be 1,2, 4, 8, 16, 32, or 64");
-          }
-          bytes_ = bytes;
-          setSamplingPoints();
-        }
-
         LATCHDescriptorExtractorImpl::LATCHDescriptorExtractorImpl(int bytes, bool rotationInvariance, int half_ssd_size, double sigma) :
             bytes_(bytes), test_fn_(NULL), rotationInvariance_(rotationInvariance), half_ssd_size_(half_ssd_size), sigma_(sigma)
         {
-            setBytes(bytes_);
+            switch (bytes)
+            {
+            case 1:
+                test_fn_ = pixelTests1;
+                break;
+            case 2:
+                test_fn_ = pixelTests2;
+                break;
+            case 4:
+                test_fn_ = pixelTests4;
+                break;
+            case 8:
+                test_fn_ = pixelTests8;
+                break;
+            case 16:
+                test_fn_ = pixelTests16;
+                break;
+            case 32:
+                test_fn_ = pixelTests32;
+                break;
+            case 64:
+                test_fn_ = pixelTests64;
+                break;
+            default:
+                CV_Error(Error::StsBadArg, "descriptorSize must be 1,2, 4, 8, 16, 32, or 64");
+            }
+
+            setSamplingPoints();
         }
 
         int LATCHDescriptorExtractorImpl::descriptorSize() const
@@ -475,31 +454,39 @@ namespace cv
 
         void LATCHDescriptorExtractorImpl::read(const FileNode& fn)
         {
-            // if node is empty, keep previous value
-            if (!fn["descriptorSize"].empty())
+            int dSize = fn["descriptorSize"];
+            switch (dSize)
             {
-                int bytes = fn["descriptorSize"];
-                setBytes(bytes);
+            case 1:
+                test_fn_ = pixelTests1;
+                break;
+            case 2:
+                test_fn_ = pixelTests2;
+                break;
+            case 4:
+                test_fn_ = pixelTests4;
+                break;
+            case 8:
+                test_fn_ = pixelTests8;
+                break;
+            case 16:
+                test_fn_ = pixelTests16;
+                break;
+            case 32:
+                test_fn_ = pixelTests32;
+                break;
+            case 64:
+                test_fn_ = pixelTests64;
+                break;
+            default:
+                CV_Error(Error::StsBadArg, "descriptorSize must be 1,2, 4, 8, 16, 32, or 64");
             }
-            if (!fn["rotationInvariance"].empty())
-              fn["rotationInvariance"] >> rotationInvariance_;
-            if (!fn["half_ssd_size"].empty())
-              fn["half_ssd_size"] >> half_ssd_size_;
-            if (!fn["sigma"].empty())
-              fn["sigma"] >> sigma_;
+            bytes_ = dSize;
         }
 
         void LATCHDescriptorExtractorImpl::write(FileStorage& fs) const
         {
-          if ( fs.isOpened() )
-          {
-              fs << "name" << getDefaultName();
-              fs << "descriptorSize" << bytes_;
-              fs << "rotationInvariance" << rotationInvariance_;
-              fs << "half_ssd_size" << half_ssd_size_;
-              fs << "sigma" << sigma_;
-
-          }
+            fs << "descriptorSize" << bytes_;
         }
 
         void LATCHDescriptorExtractorImpl::compute(InputArray _image,

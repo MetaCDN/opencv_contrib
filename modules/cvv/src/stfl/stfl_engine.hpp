@@ -22,17 +22,6 @@
 #include "element_group.hpp"
 #include "../qtutil/util.hpp"
 
-
-// WORKAROUND:
-//   - Qt::SplitBehavior introduced in 5.14, QString::SplitBehavior was removed in Qt6
-//   - Support required part of Qt::SplitBehavior from 5.15 for older Qt versions
-#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-namespace Qt {
-	static constexpr QString::SplitBehavior SkipEmptyParts = QString::SkipEmptyParts;
-}
-#endif
-
-
 namespace cvv
 {
 namespace stfl
@@ -173,7 +162,7 @@ template <typename Element> class STFLEngine
 		}
 		QList<Element> elemList;
 		QStringList cmdStrings =
-		    query.split("#", Qt::SkipEmptyParts);
+		    query.split("#", QString::SkipEmptyParts);
 		elemList = executeFilters(elements, cmdStrings);
 		elemList = executeSortCmds(elemList, cmdStrings);
 		auto groups = executeGroupCmds(elemList, cmdStrings);
@@ -560,7 +549,7 @@ private:
 		{
 			using namespace std::placeholders;
 			QStringList arr =
-			    cmdString.split(" ", Qt::SkipEmptyParts);
+			    cmdString.split(" ", QString::SkipEmptyParts);
 			QString cmd;
 			if (arr.empty())
 			{
@@ -581,7 +570,7 @@ private:
 			else if (isFilterCSCmd(cmd))
 			{
 				QStringList arguments = arr.join("").split(
-				    ",", Qt::SkipEmptyParts);
+				    ",", QString::SkipEmptyParts);
 				std::for_each(arguments.begin(),
 				              arguments.end(), [](QString &str)
 				{ str.replace("\\,", ","); });
@@ -620,7 +609,7 @@ private:
 		for (QString cmdString : cmdStrings)
 		{
 			QStringList arr =
-			    cmdString.split(" ", Qt::SkipEmptyParts);
+			    cmdString.split(" ", QString::SkipEmptyParts);
 			if (arr.size() < 2)
 			{
 				continue;
@@ -630,7 +619,7 @@ private:
 			{
 				arr.removeFirst();
 			}
-			arr = arr.join(" ").split(",", Qt::SkipEmptyParts);
+			arr = arr.join(" ").split(",", QString::SkipEmptyParts);
 			for (QString cmdPart : arr)
 			{
 				cmdPart = cmdPart.trimmed();
@@ -658,7 +647,7 @@ private:
 			if (sortCmd.second)
 			{
 				auto sortFunc = sortFuncs[sortCmd.first];
-				std::stable_sort(resList.begin(), resList.end(),
+				qStableSort(resList.begin(), resList.end(),
 				            [&](const Element &elem1,
 				                const Element &elem2)
 				{ return sortFunc(elem1, elem2); });
@@ -666,7 +655,7 @@ private:
 			else
 			{
 				auto sortFunc = sortFuncs[sortCmd.first];
-				std::stable_sort(resList.begin(), resList.end(),
+				qStableSort(resList.begin(), resList.end(),
 				            [&](const Element &elem1,
 				                const Element &elem2)
 				{ return sortFunc(elem2, elem1); });
@@ -686,7 +675,7 @@ private:
 		for (QString cmdString : cmdStrings)
 		{
 			QStringList arr =
-			    cmdString.split(" ", Qt::SkipEmptyParts);
+			    cmdString.split(" ", QString::SkipEmptyParts);
 			if (arr.size() < 2)
 			{
 				continue;
@@ -700,7 +689,7 @@ private:
 			{
 				arr.removeFirst();
 			}
-			arr = arr.join("").split(",", Qt::SkipEmptyParts);
+			arr = arr.join("").split(",", QString::SkipEmptyParts);
 			for (QString cmdPart : arr)
 			{
 				QStringList cmdPartList = cmdPart.split(" ");
@@ -731,7 +720,7 @@ private:
 		for (auto it = groups.begin(); it != groups.end(); ++it)
 		{
 			ElementGroup<Element> elementGroup(
-			    it->first.split("\\|", Qt::SkipEmptyParts),
+			    it->first.split("\\|", QString::SkipEmptyParts),
 			    it->second);
 			groupList.push_back(elementGroup);
 		}
@@ -744,7 +733,7 @@ private:
 		for (QString cmdString : cmdStrings)
 		{
 			QStringList arr =
-			    cmdString.split(" ", Qt::SkipEmptyParts);
+			    cmdString.split(" ", QString::SkipEmptyParts);
 			if (arr.isEmpty())
 			{
 				continue;
@@ -754,7 +743,7 @@ private:
 			{
 				continue;
 			}
-			arr = arr.join("").split(",", Qt::SkipEmptyParts);
+			arr = arr.join("").split(",", QString::SkipEmptyParts);
 			additionalCommandFuncs[cmd](arr, groups);
 		}
 	}
@@ -773,11 +762,11 @@ private:
 		if (cmd == "group" || cmd == "sort")
 		{
 			int frontCut =
-			    std::min(size_t(hasByString ? 2 : 1), size_t(tokens.size()));
-			tokens = cmdQuery.split(" ", Qt::SkipEmptyParts)
+			    std::min(1 + (hasByString ? 1 : 0), tokens.size());
+			tokens = cmdQuery.split(" ", QString::SkipEmptyParts)
 			             .mid(frontCut, tokens.size());
 			QStringList args = tokens.join(" ").split(
-			    ",", Qt::SkipEmptyParts);
+			    ",", QString::SkipEmptyParts);
 			args.removeDuplicates();
 			for (auto &arg : args)
 			{
@@ -817,7 +806,7 @@ private:
 			else
 			{
 				QStringList args = rejoined.split(
-				    ",", Qt::SkipEmptyParts);
+				    ",", QString::SkipEmptyParts);
 				if (isFilterCmd(cmd))
 				{
 					suggs = getSuggestionsForFilterCSCmd(cmd, args);
@@ -913,7 +902,7 @@ private:
 	QStringList getSuggestionsForFilterCmd(const QString &cmd,
 	                                       const QString &argument)
 	{
-		QStringList pool(filterPool[cmd].values());
+		QStringList pool(filterPool[cmd].toList());
 		return sortStringsByStringEquality(pool, argument);
 	}
 
@@ -929,7 +918,7 @@ private:
 		{
 			last = args[args.size() - 1];
 		}
-		QStringList pool(filterCSPool[cmd].values());
+		QStringList pool(filterCSPool[cmd].toList());
 		QStringList list = sortStringsByStringEquality(pool, last);
 		for (QString &item : list)
 		{
@@ -1033,7 +1022,7 @@ private:
 	void addQueryToStore(QString query)
 	{
 		QStringList storedCmds = getStoredCmds();
-		QStringList cmds = query.split("#", Qt::SkipEmptyParts);
+		QStringList cmds = query.split("#", QString::SkipEmptyParts);
 		cmds.removeDuplicates();
 		for (QString cmd : cmds)
 		{
@@ -1093,12 +1082,12 @@ private:
 	{
 		QMap<int, QStringList> weightedStrings;
 		auto compareWithWords =
-		    compareWith.split(" ", Qt::SkipEmptyParts);
+		    compareWith.split(" ", QString::SkipEmptyParts);
 		for (const QString &str : strings)
 		{
 			int strEqu = 0xFFFFFF; // infinity...
 			for (auto word :
-			     str.split(" ", Qt::SkipEmptyParts))
+			     str.split(" ", QString::SkipEmptyParts))
 			{
 				auto wordA = word.leftJustified(15, ' ');
 				for (const auto &word2 : compareWithWords)

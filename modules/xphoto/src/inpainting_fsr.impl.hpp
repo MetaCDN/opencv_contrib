@@ -318,7 +318,7 @@ icvGetTodoBlocks(Mat& sampled_img, Mat& sampling_mask, std::vector< std::tuple< 
         Mat error_mask_2d = sampling_mask(Range(yblock_counter*block_size - top_border, std::min(img_height, (yblock_counter*block_size + block_size + bottom_border))), Range(xblock_counter*block_size - left_border, std::min(img_width, (xblock_counter*block_size + block_size + right_border))));
 
         // determine normalized and weighted standard deviation
-        if (block_size > block_size_min && xblock_counter < sigma_n_array.cols && yblock_counter < sigma_n_array.rows)
+        if (block_size > block_size_min)
         {
             double sigma_n = icvStandardDeviation(distorted_block_2d, error_mask_2d);
             sigma_n_array.at<double>( yblock_counter, xblock_counter) = sigma_n;
@@ -748,7 +748,7 @@ icvDetermineProcessingOrder(
 
 
 static
-void inpaint_fsr(Mat src, const Mat &mask, Mat &dst, const int algorithmType)
+void inpaint_fsr(const Mat &src, const Mat &mask, Mat &dst, const int algorithmType)
 {
     CV_Assert(algorithmType == xphoto::INPAINT_FSR_BEST || algorithmType == xphoto::INPAINT_FSR_FAST);
     CV_Check(src.channels(), src.channels() == 1 || src.channels() == 3, "");
@@ -767,7 +767,7 @@ void inpaint_fsr(Mat src, const Mat &mask, Mat &dst, const int algorithmType)
                 CV_Error(Error::StsUnsupportedFormat, "Unsupported source image format!");
                 break;
             }
-            src.convertTo(src, CV_8U, 1/256.0);
+            src.convertTo(src, CV_8U, 1/257.0);
             break;
         }
         case CV_32FC1:

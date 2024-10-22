@@ -235,33 +235,35 @@ void integrateVolumeUnit(
                     // optimization of the following:
                     //Point3f volPt = Point3f(x, y, z)*voxelSize;
                     //Point3f camSpacePt = vol2cam * volPt;
-                    camSpacePt = v_add(camSpacePt, zStep);
+                    camSpacePt += zStep;
 
-                    float zCamSpace = v_get0(v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(camSpacePt))));
+                    float zCamSpace = v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(camSpacePt))).get0();
                     if (zCamSpace <= 0.f)
                         continue;
 
-                    v_float32x4 camPixVec = v_div(camSpacePt, v_setall_f32(zCamSpace));
+                    v_float32x4 camPixVec = camSpacePt / v_setall_f32(zCamSpace);
                     v_float32x4 projected = v_muladd(camPixVec, vfxy, vcxy);
                     // leave only first 2 lanes
-                    projected = v_reinterpret_as_f32(v_and(v_reinterpret_as_u32(projected), v_uint32x4(4294967295U, 4294967295U, 0, 0)));
+                    projected = v_reinterpret_as_f32(v_reinterpret_as_u32(projected) &
+                        v_uint32x4(0xFFFFFFFF, 0xFFFFFFFF, 0, 0));
 
                     depthType v;
                     // bilinearly interpolate depth at projected
                     {
                         const v_float32x4& pt = projected;
                         // check coords >= 0 and < imgSize
-                        v_uint32x4 limits = v_or(v_reinterpret_as_u32(v_lt(pt, v_setzero_f32())), v_reinterpret_as_u32(v_ge(pt, upLimits)));
-                        limits = v_or(limits, v_rotate_right<1>(limits));
-                        if (v_get0(limits))
+                        v_uint32x4 limits = v_reinterpret_as_u32(pt < v_setzero_f32()) |
+                            v_reinterpret_as_u32(pt >= upLimits);
+                        limits = limits | v_rotate_right<1>(limits);
+                        if (limits.get0())
                             continue;
 
                         // xi, yi = floor(pt)
                         v_int32x4 ip = v_floor(pt);
                         v_int32x4 ipshift = ip;
-                        int xi = v_get0(ipshift);
+                        int xi = ipshift.get0();
                         ipshift = v_rotate_right<1>(ipshift);
-                        int yi = v_get0(ipshift);
+                        int yi = ipshift.get0();
 
                         const depthType* row0 = depth[yi + 0];
                         const depthType* row1 = depth[yi + 1];
@@ -275,17 +277,17 @@ void integrateVolumeUnit(
 
                         // assume correct depth is positive
                         // don't fix missing data
-                        if (v_check_all(v_gt(vall, v_setzero_f32())))
+                        if (v_check_all(vall > v_setzero_f32()))
                         {
-                            v_float32x4 t = v_sub(pt, v_cvt_f32(ip));
-                            float tx = v_get0(t);
+                            v_float32x4 t = pt - v_cvt_f32(ip);
+                            float tx = t.get0();
                             t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-                            v_float32x4 ty = v_setall_f32(v_get0(t));
+                            v_float32x4 ty = v_setall_f32(t.get0());
                             // vx is y-interpolated between rows 0 and 1
-                            v_float32x4 vx = v_add(v001, v_mul(ty, v_sub(v101, v001)));
-                            float v0 = v_get0(vx);
+                            v_float32x4 vx = v001 + ty * (v101 - v001);
+                            float v0 = vx.get0();
                             vx = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(vx)));
-                            float v1 = v_get0(vx);
+                            float v1 = vx.get0();
                             v = v0 + tx * (v1 - v0);
                         }
                         else
@@ -293,8 +295,8 @@ void integrateVolumeUnit(
                     }
 
                     // norm(camPixVec) produces double which is too slow
-                    int _u = (int)v_get0(projected);
-                    int _v = (int)v_get0(v_rotate_right<1>(projected));
+                    int _u = (int)projected.get0();
+                    int _v = (int)v_rotate_right<1>(projected).get0();
                     if (!(_u >= 0 && _u < depth.cols && _v >= 0 && _v < depth.rows))
                         continue;
                     float pixNorm = pixNorms.at<float>(_v, _u);
@@ -498,33 +500,35 @@ void integrateRGBVolumeUnit(
                     // optimization of the following:
                     //Point3f volPt = Point3f(x, y, z)*voxelSize;
                     //Point3f camSpacePt = vol2cam * volPt;
-                    camSpacePt = v_add(camSpacePt, zStep);
+                    camSpacePt += zStep;
 
-                    float zCamSpace = v_get0(v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(camSpacePt))));
+                    float zCamSpace = v_reinterpret_as_f32(v_rotate_right<2>(v_reinterpret_as_u32(camSpacePt))).get0();
                     if (zCamSpace <= 0.f)
                         continue;
 
-                    v_float32x4 camPixVec = v_div(camSpacePt, v_setall_f32(zCamSpace));
+                    v_float32x4 camPixVec = camSpacePt / v_setall_f32(zCamSpace);
                     v_float32x4 projected = v_muladd(camPixVec, vfxy, vcxy);
                     // leave only first 2 lanes
-                    projected = v_reinterpret_as_f32(v_and(v_reinterpret_as_u32(projected), v_uint32x4(4294967295U, 4294967295U, 0, 0)));
+                    projected = v_reinterpret_as_f32(v_reinterpret_as_u32(projected) &
+                        v_uint32x4(0xFFFFFFFF, 0xFFFFFFFF, 0, 0));
 
                     depthType v;
                     // bilinearly interpolate depth at projected
                     {
                         const v_float32x4& pt = projected;
                         // check coords >= 0 and < imgSize
-                        v_uint32x4 limits = v_or(v_reinterpret_as_u32(v_lt(pt, v_setzero_f32())), v_reinterpret_as_u32(v_ge(pt, upLimits)));
-                        limits = v_or(limits,v_rotate_right<1>(limits));
-                        if (v_get0(limits))
+                        v_uint32x4 limits = v_reinterpret_as_u32(pt < v_setzero_f32()) |
+                            v_reinterpret_as_u32(pt >= upLimits);
+                        limits = limits | v_rotate_right<1>(limits);
+                        if (limits.get0())
                             continue;
 
                         // xi, yi = floor(pt)
                         v_int32x4 ip = v_floor(pt);
                         v_int32x4 ipshift = ip;
-                        int xi = v_get0(ipshift);
+                        int xi = ipshift.get0();
                         ipshift = v_rotate_right<1>(ipshift);
-                        int yi = v_get0(ipshift);
+                        int yi = ipshift.get0();
 
                         const depthType* row0 = depth[yi + 0];
                         const depthType* row1 = depth[yi + 1];
@@ -538,17 +542,17 @@ void integrateRGBVolumeUnit(
 
                         // assume correct depth is positive
                         // don't fix missing data
-                        if (v_check_all(v_gt(vall, v_setzero_f32())))
+                        if (v_check_all(vall > v_setzero_f32()))
                         {
-                            v_float32x4 t = v_sub(pt, v_cvt_f32(ip));
-                            float tx = v_get0(t);
+                            v_float32x4 t = pt - v_cvt_f32(ip);
+                            float tx = t.get0();
                             t = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(t)));
-                            v_float32x4 ty = v_setall_f32(v_get0(t));
+                            v_float32x4 ty = v_setall_f32(t.get0());
                             // vx is y-interpolated between rows 0 and 1
-                            v_float32x4 vx = v_add(v001, v_mul(ty, v_sub(v101, v001)));
-                            float v0 = v_get0(vx);
+                            v_float32x4 vx = v001 + ty * (v101 - v001);
+                            float v0 = vx.get0();
                             vx = v_reinterpret_as_f32(v_rotate_right<1>(v_reinterpret_as_u32(vx)));
-                            float v1 = v_get0(vx);
+                            float v1 = vx.get0();
                             v = v0 + tx * (v1 - v0);
                         }
                         else
@@ -557,13 +561,14 @@ void integrateRGBVolumeUnit(
 
                     v_float32x4 projectedRGB = v_muladd(camPixVec, rgb_vfxy, rgb_vcxy);
                     // leave only first 2 lanes
-                    projectedRGB = v_reinterpret_as_f32(v_and(v_reinterpret_as_u32(projected), v_uint32x4(0xFFFFFFFF, 0xFFFFFFFF, 0, 0)));
+                    projectedRGB = v_reinterpret_as_f32(v_reinterpret_as_u32(projected) &
+                        v_uint32x4(0xFFFFFFFF, 0xFFFFFFFF, 0, 0));
 
                     // norm(camPixVec) produces double which is too slow
-                    int _u = (int)v_get0(projected);
-                    int _v = (int)v_get0(v_rotate_right<1>(projected));
-                    int rgb_u = (int)v_get0(projectedRGB);
-                    int rgb_v = (int)v_get0(v_rotate_right<1>(projectedRGB));
+                    int _u = (int)projected.get0();
+                    int _v = (int)v_rotate_right<1>(projected).get0();
+                    int rgb_u = (int)projectedRGB.get0();
+                    int rgb_v = (int)v_rotate_right<1>(projectedRGB).get0();
 
                     if (!(_u >= 0 && _u < depth.cols && _v >= 0 && _v < depth.rows &&
                         rgb_v >= 0 && rgb_v < color.rows && rgb_u >= 0 && rgb_u < color.cols))

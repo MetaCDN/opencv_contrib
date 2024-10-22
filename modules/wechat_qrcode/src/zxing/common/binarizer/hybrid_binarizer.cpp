@@ -55,9 +55,7 @@ Ref<Binarizer> HybridBinarizer::createBinarizer(Ref<LuminanceSource> source) {
 }
 
 int HybridBinarizer::initBlockIntegral() {
-    blockIntegralWidth = subWidth_ + 1;
-    blockIntegralHeight = subHeight_ + 1;
-    blockIntegral_ = new Array<int>(blockIntegralWidth * blockIntegralHeight);
+    blockIntegral_ = new Array<int>(width * height);
 
     int* integral = blockIntegral_->data();
 
@@ -66,27 +64,34 @@ int HybridBinarizer::initBlockIntegral() {
     // first row only
     int rs = 0;
 
-    for (int j = 0; j < blockIntegralWidth; j++) {
+    for (int j = 0; j < width; j++) {
         integral[j] = 0;
     }
 
-    for (int i = 0; i < blockIntegralHeight; i++) {
-        integral[i * blockIntegralWidth] = 0;
+    for (int i = 0; i < height; i++) {
+        integral[i * width] = 0;
+    }
+
+    for (int j = 0; j < subWidth_; j++) {
+        rs += blocks_[j].threshold;
+        integral[width + j + 1] = rs;
     }
 
     // remaining cells are sum above and to the left
+    int offset = width;
     int offsetBlock = 0;
-    int offsetIntegral = 0;
 
-    for (int i = 0; i < subHeight_; ++i) {
+    for (int i = 1; i < subHeight_; ++i) {
         // therow = grayByte_->getByteRow(i);
         offsetBlock = i * subWidth_;
-        offsetIntegral = (i + 1) * blockIntegralWidth;
+
         rs = 0;
+
+        offset += width;
 
         for (int j = 0; j < subWidth_; ++j) {
             rs += blocks_[offsetBlock + j].threshold;
-            integral[offsetIntegral + j + 1] = rs + integral[offsetIntegral - blockIntegralWidth + j + 1];
+            integral[offset + j + 1] = rs + integral[offset - width + j + 1];
         }
     }
 
@@ -196,8 +201,8 @@ void HybridBinarizer::calculateThresholdForBlock(Ref<ByteMatrix>& _luminances, i
             int sum = 0;
             // int sum2 = 0;
 
-            int offset1 = (top - THRES_BLOCKSIZE) * blockIntegralWidth + left - THRES_BLOCKSIZE;
-            int offset2 = (top + THRES_BLOCKSIZE + 1) * blockIntegralWidth + left - THRES_BLOCKSIZE;
+            int offset1 = (top - THRES_BLOCKSIZE) * (subWidth + 1) + left - THRES_BLOCKSIZE;
+            int offset2 = (top + THRES_BLOCKSIZE + 1) * (subWidth + 1) + left - THRES_BLOCKSIZE;
 
             int blocksize = THRES_BLOCKSIZE * 2 + 1;
 

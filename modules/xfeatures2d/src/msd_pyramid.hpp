@@ -60,7 +60,7 @@ public:
     }
     ~MSDImagePyramid() {};
 
-    std::vector<cv::Mat> getImPyr() const
+    const std::vector<cv::Mat> getImPyr() const
     {
         return m_imPyr;
     };

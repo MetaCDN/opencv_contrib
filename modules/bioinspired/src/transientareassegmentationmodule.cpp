@@ -136,13 +136,13 @@ public:
     /**
      * @return the current parameters setup
      */
-    SegmentationParameters getParameters();
+    struct SegmentationParameters getParameters();
 
     /**
      * parameters setup display method
      * @return a string which contains formatted parameters information
      */
-    String printSetup();
+    const String printSetup();
 
     /**
      * write xml/yml formated parameters information
@@ -202,7 +202,7 @@ protected:
      */
     inline const std::valarray<float> &getMotionContextPicture() const {return _contextMotionEnergy;}
 
-    cv::bioinspired::SegmentationParameters _segmentationParameters;
+    struct cv::bioinspired::SegmentationParameters _segmentationParameters;
     // template buffers and related acess pointers
     std::valarray<float> _inputToSegment;
     std::valarray<float> _contextMotionEnergy;
@@ -232,8 +232,8 @@ public:
     inline virtual void setup(String segmentationParameterFile, const bool applyDefaultSetupOnFailure) CV_OVERRIDE { _segmTool.setup(segmentationParameterFile, applyDefaultSetupOnFailure); }
     inline virtual void setup(cv::FileStorage &fs, const bool applyDefaultSetupOnFailure) CV_OVERRIDE { _segmTool.setup(fs, applyDefaultSetupOnFailure); }
     inline virtual void setup(SegmentationParameters newParameters) CV_OVERRIDE { _segmTool.setup(newParameters); }
-    inline virtual String printSetup() CV_OVERRIDE { return _segmTool.printSetup(); }
-    inline virtual SegmentationParameters getParameters() CV_OVERRIDE { return _segmTool.getParameters(); }
+    inline virtual const String printSetup() CV_OVERRIDE { return _segmTool.printSetup(); }
+    inline virtual struct SegmentationParameters getParameters() CV_OVERRIDE { return _segmTool.getParameters(); }
     inline virtual void write( String fs ) const CV_OVERRIDE { _segmTool.write(fs); }
     inline virtual void run(InputArray inputToSegment, const int channelIndex) CV_OVERRIDE { _segmTool.run(inputToSegment, channelIndex); }
     inline virtual void getSegmentationPicture(OutputArray transientAreas) CV_OVERRIDE { return _segmTool.getSegmentationPicture(transientAreas); }
@@ -285,7 +285,7 @@ void TransientAreasSegmentationModuleImpl::clearAllBuffers()
     _segmentedAreas=0;
 }
 
-SegmentationParameters TransientAreasSegmentationModuleImpl::getParameters()
+struct SegmentationParameters TransientAreasSegmentationModuleImpl::getParameters()
 {
     return _segmentationParameters;
 }
@@ -343,7 +343,7 @@ void TransientAreasSegmentationModuleImpl::setup(cv::FileStorage &fs, const bool
         std::cout<<"Retina::setup: resetting retina with default parameters"<<std::endl;
         if (applyDefaultSetupOnFailure)
         {
-            cv::bioinspired::SegmentationParameters defaults;
+            struct cv::bioinspired::SegmentationParameters defaults;
             setup(defaults);
         }
         std::cout<<"SegmentationModule::setup: wrong/unappropriate xml parameter file : error report :`n=>"<<e.what()<<std::endl;
@@ -356,7 +356,7 @@ void TransientAreasSegmentationModuleImpl::setup(cv::bioinspired::SegmentationPa
 {
 
     // copy structure contents
-    _segmentationParameters = newParameters;
+    memcpy(&_segmentationParameters, &newParameters, sizeof(cv::bioinspired::SegmentationParameters));
     // apply setup
     // init local motion energy extraction low pass filter
     BasicRetinaFilter::setLPfilterParameters(0, newParameters.localEnergy_temporalConstant, newParameters.localEnergy_spatialConstant);
@@ -368,7 +368,7 @@ void TransientAreasSegmentationModuleImpl::setup(cv::bioinspired::SegmentationPa
 
 }
 
-String TransientAreasSegmentationModuleImpl::printSetup()
+const String TransientAreasSegmentationModuleImpl::printSetup()
 {
     std::stringstream outmessage;
 

@@ -293,6 +293,10 @@ static void FHT(Mat       &dst,
     else
         CV_Assert(src.cols == dst.rows && src.rows == dst.cols);
 
+    int level = 0;
+    for (int thres = 1; dst.rows > thres; thres <<= 1)
+        level++;
+
     Mat tmp;
     src.convertTo(tmp, dst.type());
     if (!isVertical)

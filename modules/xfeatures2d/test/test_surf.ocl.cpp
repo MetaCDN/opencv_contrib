@@ -78,35 +78,13 @@ static int getMatchedPointsCount(std::vector<cv::KeyPoint>& gold, std::vector<cv
 
     int validCount = 0;
 
-    if (actual.size() == gold.size())
+    for (size_t i = 0; i < gold.size(); ++i)
     {
-        for (size_t i = 0; i < gold.size(); ++i)
-        {
-            const cv::KeyPoint& p1 = gold[i];
-            const cv::KeyPoint& p2 = actual[i];
+        const cv::KeyPoint& p1 = gold[i];
+        const cv::KeyPoint& p2 = actual[i];
 
-            if (keyPointsEquals(p1, p2))
-                ++validCount;
-        }
-    }
-    else
-    {
-        std::vector<cv::KeyPoint>& shorter = gold;
-        std::vector<cv::KeyPoint>& longer = actual;
-        if (actual.size() < gold.size())
-        {
-            shorter = actual;
-            longer = gold;
-        }
-        for (size_t i = 0; i < shorter.size(); ++i)
-        {
-            const cv::KeyPoint& p1 = shorter[i];
-            const cv::KeyPoint& p2 = longer[i];
-            const cv::KeyPoint& p3 = longer[i+1];
-
-            if (keyPointsEquals(p1, p2) || keyPointsEquals(p1, p3))
-                ++validCount;
-        }
+        if (keyPointsEquals(p1, p2))
+            ++validCount;
     }
 
     return validCount;
@@ -176,8 +154,7 @@ TEST_P(SURF, Detector)
     std::vector<cv::KeyPoint> keypoints_gold;
     surf->detect(image, keypoints_gold, cv::noArray());
 
-    int lengthDiff = abs((int)keypoints_gold.size()) - ((int)keypoints.size());
-    EXPECT_LE(lengthDiff, 1);
+    ASSERT_EQ(keypoints_gold.size(), keypoints.size());
     int matchedCount = getMatchedPointsCount(keypoints_gold, keypoints);
     double matchedRatio = static_cast<double>(matchedCount) / keypoints_gold.size();
 

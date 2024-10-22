@@ -49,15 +49,14 @@ using namespace cv;
 using namespace cv::cudacodec;
 using namespace cv::cudacodec::detail;
 
-bool cv::cudacodec::detail::VideoSource::parseVideoData(const unsigned char* data, size_t size, const bool rawMode, const bool containsKeyFrame, bool endOfStream)
+bool cv::cudacodec::detail::VideoSource::parseVideoData(const unsigned char* data, size_t size, bool endOfStream)
 {
-    return videoParser_->parseVideoData(data, size, rawMode, containsKeyFrame, endOfStream);
+    return videoParser_->parseVideoData(data, size, endOfStream);
 }
 
-cv::cudacodec::detail::RawVideoSourceWrapper::RawVideoSourceWrapper(const Ptr<RawVideoSource>& source, const bool rawMode) :
+cv::cudacodec::detail::RawVideoSourceWrapper::RawVideoSourceWrapper(const Ptr<RawVideoSource>& source) :
     source_(source)
 {
-    SetRawMode(rawMode);
     CV_Assert( !source_.empty() );
 }
 
@@ -66,14 +65,9 @@ cv::cudacodec::FormatInfo cv::cudacodec::detail::RawVideoSourceWrapper::format()
     return source_->format();
 }
 
-void cv::cudacodec::detail::RawVideoSourceWrapper::updateFormat(const FormatInfo& videoFormat)
+void cv::cudacodec::detail::RawVideoSourceWrapper::updateFormat(const int codedWidth, const int codedHeight)
 {
-    source_->updateFormat(videoFormat);
-}
-
-bool cv::cudacodec::detail::RawVideoSourceWrapper::get(const int propertyId, double& propertyVal) const
-{
-    return source_->get(propertyId, propertyVal);
+    source_->updateFormat(codedWidth,codedHeight);
 }
 
 void cv::cudacodec::detail::RawVideoSourceWrapper::start()
@@ -115,19 +109,7 @@ void cv::cudacodec::detail::RawVideoSourceWrapper::readLoop(void* userData)
             break;
         }
 
-        bool containsKeyFrame = false;
-        if (thiz->RawModeEnabled()) {
-            containsKeyFrame = thiz->source_->lastPacketContainsKeyFrame();
-            if (!thiz->extraDataQueried) {
-                thiz->extraDataQueried = true;
-                Mat extraData;
-                thiz->source_->getExtraData(extraData);
-                if(!extraData.empty())
-                    thiz->setExtraData(extraData);
-            }
-        }
-
-        if (!thiz->parseVideoData(data, size, thiz->RawModeEnabled(), containsKeyFrame))
+        if (!thiz->parseVideoData(data, size))
         {
             thiz->hasError_ = true;
             break;
@@ -137,8 +119,7 @@ void cv::cudacodec::detail::RawVideoSourceWrapper::readLoop(void* userData)
             break;
     }
 
-    if(!thiz->hasError_)
-        thiz->parseVideoData(0, 0, false, false, true);
+    thiz->parseVideoData(0, 0, true);
 }
 
 #endif // HAVE_NVCUVID
