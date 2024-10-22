@@ -40,12 +40,6 @@ $ cmake -D OPENCV_EXTRA_MODULES_PATH=<opencv_contrib>/modules -D BUILD_opencv_<r
 
 - **hdf**: Hierarchical Data Storage -- This module contains I/O routines for Hierarchical Data Format: https://en.m.wikipedia.org/wiki/Hierarchical_Data_Format meant to store large amounts of data.
 
-- **hfs**: Hierarchical Feature Selection for Efficient Image Segmentation -- This module contains an efficient algorithm to segment an image.
-
-- **img_hash**: This module contains algorithms to extract hash of an image allowing to efficiently estimate similarity between images.
-
-- **intensity_transform**: The module brings implementations of intensity transformation algorithms to adjust image contrast.
-
 - **julia**: Julia language wrappers with samples and tests.
 
 - **line_descriptor**: Line Segment Extract and Match -- Methods of extracting, describing and matching line segments using binary descriptors.
@@ -58,13 +52,7 @@ $ cmake -D OPENCV_EXTRA_MODULES_PATH=<opencv_contrib>/modules -D BUILD_opencv_<r
 
 - **ovis**: OGRE 3D Visualiser -- allows you to render 3D data using the OGRE 3D engine.
 
-- **phase_unwrapping**: Quality-guided phase unwrapping.
-
 - **plot**: Plotting -- The plot module allows you to easily plot data in 1D or 2D.
-
-- **quality**: Image Quality Analysis (IQA) API.
-
-- **rapid**: Silhouette based 3D object tracking.
 
 - **reg**: Image Registration -- Pixels based image registration for precise alignment. Follows the paper "Image Alignment and Stitching: A Tutorial", by Richard Szeliski.
 
@@ -74,25 +62,15 @@ $ cmake -D OPENCV_EXTRA_MODULES_PATH=<opencv_contrib>/modules -D BUILD_opencv_<r
 
 - **sfm**: Structure from Motion -- This module contains algorithms to perform 3d reconstruction from 2d images. The core of the module is a light version of Libmv.
 
-- **shape**: Shape Distance and Matching
-
 - **stereo**: Stereo Correspondence -- Stereo matching done with different descriptors: Census / CS-Census / MCT / BRIEF / MV and dense stereo correspondence using Quasi Dense Stereo method.
 
 - **structured_light**: Structured Light Use -- How to generate and project gray code patterns and use them to find dense depth in a scene.
 
-- **superres**: Super Resolution
-
 - **surface_matching**: Point Pair Features -- Implements 3d object detection and localization using multimodal point pair features.
 
-- **text**: Scene Text Detection and Recognition -- This module contains algorithms to perform text detection, words segmentation and text recognition in a visual scene.
+- **text**: Visual Text Matching -- In a visual scene, detect text, segment words and recognise the text.
 
-- **tracking**: Vision Based Object Tracking -- Use and/or evaluate different visual object tracking techniques.
-
-- **videostab**: Video Stabilization
-
-- **viz**: 3D Visualizer
-
-- **wechat_qrcode**: WeChat QR code detector for detecting and parsing QR code.
+- **tracking**: Vision Based Object Tracking -- Use and/or evaluate one of 5 different visual object tracking techniques.
 
 - **xfeatures2d**: Features2D extra -- Extra 2D Features Framework containing experimental and non-free 2D feature detector/descriptor algorithms. SURF, BRIEF, Censure, Freak, LUCID, Daisy, Self-similar.
 

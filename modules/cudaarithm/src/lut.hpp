@@ -15,10 +15,14 @@ class LookUpTableImpl : public LookUpTable
 {
 public:
     LookUpTableImpl(InputArray lut);
+    ~LookUpTableImpl();
+
     void transform(InputArray src, OutputArray dst, Stream& stream = Stream::Null()) CV_OVERRIDE;
+
 private:
     GpuMat d_lut;
-    size_t szInBytes = 0;
+    cudaTextureObject_t texLutTableObj;
+    bool cc30;
 };
 
 } }

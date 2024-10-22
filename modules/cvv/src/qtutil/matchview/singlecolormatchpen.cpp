@@ -23,7 +23,7 @@ SingleColorMatchPen::SingleColorMatchPen(std::vector<cv::DMatch>, QWidget *paren
 	connect(button.get(), SIGNAL(clicked(bool)), this,
 		SLOT(colorButtonClicked()));
 
-	layout->setContentsMargins(QMargins());
+	layout->setMargin(0);
 	layout->addWidget(button.release());
 
 	setLayout(layout.release());

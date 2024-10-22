@@ -108,8 +108,8 @@ void WBDetectorImpl::train(
     vector<Mat> pos_imgs = read_imgs(pos_samples_path);
     vector<Mat> neg_imgs = sample_patches(neg_imgs_path, 24, 24, pos_imgs.size() * 10);
 
-    CV_Assert(pos_imgs.size());
-    CV_Assert(neg_imgs.size());
+    assert(pos_imgs.size());
+    assert(neg_imgs.size());
 
     int n_features;
     Mat pos_data, neg_data;
@@ -173,7 +173,7 @@ void WBDetectorImpl::train(
             if (confidences.rows > 0) {
                 Mat1i indices;
                 sortIdx(confidences, indices,
-                        SORT_EVERY_COLUMN + SORT_DESCENDING);
+                        CV_SORT_EVERY_COLUMN + CV_SORT_DESCENDING);
 
                 int win_count = min(max_per_image, confidences.rows);
                 win_count = min(win_count, stage_neg - bootstrap_count);
@@ -209,7 +209,7 @@ void WBDetectorImpl::detect(
     Ptr<CvFeatureEvaluator> eval = CvFeatureEvaluator::create();
     eval->init(params, 1, Size(24, 24));
     boost_.detect(eval, img, scales, bboxes, confidences);
-    CV_Assert(confidences.size() == bboxes.size());
+    assert(confidences.size() == bboxes.size());
 }
 
 Ptr<WBDetector>

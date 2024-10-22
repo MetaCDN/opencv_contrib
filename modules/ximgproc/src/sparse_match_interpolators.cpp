@@ -198,7 +198,7 @@ void EdgeAwareInterpolatorImpl::interpolate(InputArray from_image, InputArray fr
         matches_vector[i] = SparseMatch(from_mat.at<Point2f>(i), to_mat.at<Point2f>(i));
 
 
-    std::sort(matches_vector.begin(),matches_vector.end());
+    sort(matches_vector.begin(),matches_vector.end());
 
     match_num = (int)matches_vector.size();
     CV_Assert(match_num<SHRT_MAX);
@@ -1765,6 +1765,7 @@ int RICInterpolatorImpl::PropagateModels(int spCnt, Mat & spNN, vector<int> & su
     {
         parallel_for_(Range(0, spCnt), [&](const Range& range)
         {
+            int averInlier = 0;
             int minPtCnt = 30;
             for (int i = range.start; i < range.end; i++)
             {
@@ -1794,6 +1795,7 @@ int RICInterpolatorImpl::PropagateModels(int spCnt, Mat & spNN, vector<int> & su
                     fitModel.reshape(1, 1).copyTo(outModels.row(i));
 
                 }
+                averInlier += inlierCnt;
             }
         }
         );
@@ -1812,6 +1814,7 @@ float RICInterpolatorImpl::HypothesisEvaluation(const Mat & inModel, const int *
     float errTh = 5.;
 
     // find inliers
+    int inLierCnt = 0;
     float cost = 0;
     for (int k = 0; k < matCnt; k++) {
         int matId = matNodes[k];
@@ -1835,6 +1838,7 @@ float RICInterpolatorImpl::HypothesisEvaluation(const Mat & inModel, const int *
         float dis = sqrt((tu - pu)*(tu - pu) + (tv - pv)*(tv - pv));
         if (dis < errTh) {
             outInLier.at<int>(k) = 1;
+            inLierCnt++;
             cost += wt * dis;
         }
         else {

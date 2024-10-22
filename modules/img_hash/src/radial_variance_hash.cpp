@@ -266,7 +266,7 @@ public:
         }
         else
         {
-            hash.setTo(cv::Scalar::all(0));
+            hash = 0;
         }
     }
 

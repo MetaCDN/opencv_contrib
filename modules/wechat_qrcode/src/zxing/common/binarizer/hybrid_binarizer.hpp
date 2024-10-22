@@ -35,8 +35,6 @@ private:
 
     int subWidth_;
     int subHeight_;
-    int blockIntegralWidth;
-    int blockIntegralHeight;
 
 public:
     explicit HybridBinarizer(Ref<LuminanceSource> source);

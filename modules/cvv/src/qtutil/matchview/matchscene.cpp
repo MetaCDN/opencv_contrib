@@ -153,7 +153,7 @@ void MatchScene::rightClick(const QPoint &pos)
 				pmap = rightImage_->visibleImage();
 			}
 		}else{
-			pmap = graphicView_->viewport()->grab();
+			pmap = QPixmap::grabWidget(graphicView_->viewport());
 		}
 		pmap.save(fileName, 0, 100);
 	}

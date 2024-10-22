@@ -1,8 +1,6 @@
 Aruco module FAQ {#tutorial_aruco_faq}
 ==============================
 
-@prev_tutorial{tutorial_aruco_calibration}
-
 This is a compilation of questions that can be useful for those that want to use the aruco module.
 
 - I only want to label some objects, what should I use?
@@ -26,8 +24,6 @@ in the ```DetectorParameters``` object. The first thing you can do is checking i
 as rejected candidates by the ```detectMarkers()``` function. Depending on this, you should try to modify different parameters.
 
 If you are using a ArUco board, you can also try the ```refineDetectedMarkers()``` function.
-If you are [using big markers](https://github.com/opencv/opencv_contrib/issues/2811) (400x400 pixels and more), try increasing ```adaptiveThreshWinSizeMax``` value.
-Also avoid [narrow borders](https://github.com/opencv/opencv_contrib/issues/2492) (5% or less of the marker perimeter, adjusted by ```minMarkerDistanceRate```) around markers.
 
 
 - What are the benefits of ArUco boards? What are the drawbacks?
@@ -103,7 +99,7 @@ correction during the identification step.
 Dictionary generation should only be done once at the beginning of your application and it should take some seconds. If you are
 generating the dictionary on each iteration of your detection loop, you are doing it wrong.
 
-Furthermore, it is recommendable to save the dictionary to a file with ```cv::aruco::Dictionary::writeDictionary()``` and read it with ```cv::aruco::Dictionary::readDictionary()``` on every execution, so you don't need to generate it.
+Furthermore, it is recommendable to save the dictionary to a file and read it on every execution so you dont need to generate it.
 
 
 - I would like to use some markers of the original ArUco library that I have already printed, can I use them?
@@ -128,12 +124,12 @@ If you are using one of the predefined dictionaries, it is not necessary. Otherw
 
 - Do I need to store the Board information in a file so I can use it in different executions?
 
-If you are using a ```GridBoard``` or a ```ChArUco``` board you only need to store the board measurements that are provided to the ```GridBoard::create()``` function or in or `ChArUco` constructor.
+If you are using a ```GridBoard``` or a ```ChArUco``` board you only need to store the board measurements that are provided to the ```GridBoard::create()``` or ```ChArUco::create()``` functions.
 If you manually modify the marker ids of the boards, or if you use a different type of board, you should save your board object to file.
 
 - Does the aruco module provide functions to save the Dictionary or Board to file?
 
-You can use ```cv::aruco::Dictionary::writeDictionary()``` and ```cv::aruco::Dictionary::readDictionary()``` for ```cv::aruco::Dictionary```. The data member of board classes are public and can be easily stored.
+Not right now. However the data member of both the dictionary and board classes are public and can be easily stored.
 
 
 - Alright, but how can I render a 3d model to create an augmented reality application?
@@ -151,12 +147,3 @@ You can cite the original ArUco library:
 > S. Garrido-Jurado, R. Muñoz-Salinas, F. J. Madrid-Cuevas, and M. J. Marín-Jiménez. 2014.
 > "Automatic generation and detection of highly reliable fiducial markers under occlusion".
 > Pattern Recogn. 47, 6 (June 2014), 2280-2292. DOI=10.1016/j.patcog.2014.01.005
-
-- Pose estimation markers are not being detected correctly, what can I do?
-
-It is important to remark that the estimation of the pose using only 4 coplanar points is subject to ambiguity.
-In general, the ambiguity can be solved, if the camera is near to the marker.
-However, as the marker becomes small, the errors in the corner estimation grows and ambiguity comes as a problem.
-Try increasing the size of the marker you're using, and you can also try non-symmetrical (aruco_dict_utils.cpp) markers to avoid collisions.
-Use multiple markers (ArUco/ChArUco/Diamonds boards) and pose estimation with solvePnP() with the ```SOLVEPNP_IPPE_SQUARE``` option.
-More in [this issue](https://github.com/opencv/opencv/issues/8813).

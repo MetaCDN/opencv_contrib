@@ -802,7 +802,8 @@ void CCheckerDetectorImpl::
 
         // get physical char box model
         std::vector<cv::Point2f> chartPhy;
-        get_subbox_chart_physical(points, chartPhy);
+        cv::Size size_box_phy;
+        get_subbox_chart_physical(points, chartPhy, size_box_phy);
 
         // Find the perspective transformation that brings current chart to rectangular form
         Matx33f ccT = cv::getPerspectiveTransform(points, chartPhy);
@@ -1100,7 +1101,7 @@ void CCheckerDetectorImpl::
 }
 
 void CCheckerDetectorImpl::
-    get_subbox_chart_physical(const std::vector<cv::Point2f> &points, std::vector<cv::Point2f> &chartPhy)
+    get_subbox_chart_physical(const std::vector<cv::Point2f> &points, std::vector<cv::Point2f> &chartPhy, cv::Size &size)
 {
     float w, h;
     cv::Point2f v1 = points[1] - points[0];
@@ -1116,6 +1117,8 @@ void CCheckerDetectorImpl::
     chartPhy[1] = cv::Point2f(w, 0);
     chartPhy[2] = cv::Point2f(w, h);
     chartPhy[3] = cv::Point2f(0, h);
+
+    size = cv::Size((int)w, (int)h);
 }
 
 void CCheckerDetectorImpl::

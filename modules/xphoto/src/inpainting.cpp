@@ -281,9 +281,6 @@ namespace xphoto
         /** Writing result **/
         for (size_t i = 0; i < labelSeq.size(); ++i)
         {
-            if (pPath[i].x >= img.cols || pPath[i].y >= img.rows)
-                continue;
-
             cv::Vec <float, cn> val = pointSeq[i][labelSeq[i]];
             img.template at<cv::Vec <float, cn> >(pPath[i]) = val;
         }
