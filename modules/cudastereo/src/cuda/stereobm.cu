@@ -387,6 +387,7 @@ namespace cv { namespace cuda { namespace device
             if (winsz2 == 0 || winsz2 >= calles_num)
                 CV_Error(cv::Error::StsBadArg, "Unsupported window size");
 
+<<<<<<< HEAD
             //cudaSafeCall( cudaFuncSetCacheConfig(&stereoKernel, cudaFuncCachePreferL1) );
             //cudaSafeCall( cudaFuncSetCacheConfig(&stereoKernel, cudaFuncCachePreferShared) );
 
@@ -396,6 +397,10 @@ namespace cv { namespace cuda { namespace device
             cudaSafeCall( cudaMemcpyToSymbol( cwidth, &left.cols, sizeof(left.cols) ) );
             cudaSafeCall( cudaMemcpyToSymbol( cheight, &left.rows, sizeof(left.rows) ) );
             cudaSafeCall( cudaMemcpyToSymbol( cminSSDImage, &minSSD_buf.data, sizeof(minSSD_buf.data) ) );
+=======
+            cudaSafeCall( cudaMemset2DAsync(disp.data, disp.step, 0, disp.cols, disp.rows, stream) );
+            cudaSafeCall( cudaMemset2DAsync(minSSD_buf.data, minSSD_buf.step, 0xFF, minSSD_buf.cols * minSSD_buf.elemSize(), minSSD_buf.rows, stream) );
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
             size_t minssd_step = minSSD_buf.step/minSSD_buf.elemSize();
             cudaSafeCall( cudaMemcpyToSymbol( cminSSD_step,  &minssd_step, sizeof(minssd_step) ) );

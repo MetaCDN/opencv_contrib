@@ -57,8 +57,21 @@ void cv::cudacodec::EncoderParams::save(const String&) const { throw_no_cuda(); 
 Ptr<cv::cudacodec::VideoWriter> cv::cudacodec::createVideoWriter(const String&, Size, double, SurfaceFormat) { throw_no_cuda(); return Ptr<cv::cudacodec::VideoWriter>(); }
 Ptr<cv::cudacodec::VideoWriter> cv::cudacodec::createVideoWriter(const String&, Size, double, const EncoderParams&, SurfaceFormat) { throw_no_cuda(); return Ptr<cv::cudacodec::VideoWriter>(); }
 
+<<<<<<< HEAD
 Ptr<cv::cudacodec::VideoWriter> cv::cudacodec::createVideoWriter(const Ptr<EncoderCallBack>&, Size, double, SurfaceFormat) { throw_no_cuda(); return Ptr<cv::cudacodec::VideoWriter>(); }
 Ptr<cv::cudacodec::VideoWriter> cv::cudacodec::createVideoWriter(const Ptr<EncoderCallBack>&, Size, double, const EncoderParams&, SurfaceFormat) { throw_no_cuda(); return Ptr<cv::cudacodec::VideoWriter>(); }
+=======
+#if defined(WIN32)  // remove when FFmpeg wrapper includes PR25874
+#define WIN32_WAIT_FOR_FFMPEG_WRAPPER_UPDATE
+#endif
+
+NV_ENC_BUFFER_FORMAT EncBufferFormat(const ColorFormat colorFormat);
+int NChannels(const ColorFormat colorFormat);
+GUID CodecGuid(const Codec codec);
+void FrameRate(const double fps, uint32_t& frameRateNum, uint32_t& frameRateDen);
+GUID EncodingProfileGuid(const EncodeProfile encodingProfile);
+GUID EncodingPresetGuid(const EncodePreset nvPreset);
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
 #else // !defined HAVE_NVCUVENC || !defined _WIN32
 
@@ -69,7 +82,203 @@ void RGB_to_YV12(const GpuMat& src, GpuMat& dst);
 
 namespace
 {
+<<<<<<< HEAD
     class NVEncoderWrapper
+=======
+    return std::tie(lhs.nvPreset, lhs.tuningInfo, lhs.encodingProfile, lhs.rateControlMode, lhs.multiPassEncoding, lhs.constQp.qpInterB, lhs.constQp.qpInterP, lhs.constQp.qpIntra,
+        lhs.averageBitRate, lhs.maxBitRate, lhs.targetQuality, lhs.gopLength) == std::tie(rhs.nvPreset, rhs.tuningInfo, rhs.encodingProfile, rhs.rateControlMode, rhs.multiPassEncoding, rhs.constQp.qpInterB, rhs.constQp.qpInterP, rhs.constQp.qpIntra,
+            rhs.averageBitRate, rhs.maxBitRate, rhs.targetQuality, rhs.gopLength);
+};
+
+class FFmpegVideoWriter : public EncoderCallback
+{
+public:
+    FFmpegVideoWriter(const String& fileName, const Codec codec, const int fps, const Size sz, const int idrPeriod);
+    ~FFmpegVideoWriter();
+    void onEncoded(const std::vector<std::vector<uint8_t>>& vPacket, const std::vector<uint64_t>& pts);
+    void onEncodingFinished();
+    bool setFrameIntervalP(const int frameIntervalP);
+private:
+    cv::VideoWriter writer;
+};
+
+FFmpegVideoWriter::FFmpegVideoWriter(const String& fileName, const Codec codec, const int fps, const Size sz, const int idrPeriod) {
+    if (!videoio_registry::hasBackend(CAP_FFMPEG))
+        CV_Error(Error::StsNotImplemented, "FFmpeg backend not found");
+    const int fourcc = codec == Codec::H264 ? cv::VideoWriter::fourcc('a', 'v', 'c', '1') : cv::VideoWriter::fourcc('h', 'e', 'v', '1');
+    writer.open(fileName, fourcc, fps, sz, { VideoWriterProperties::VIDEOWRITER_PROP_RAW_VIDEO, 1, VideoWriterProperties::VIDEOWRITER_PROP_KEY_INTERVAL, idrPeriod });
+    if (!writer.isOpened())
+        CV_Error(Error::StsUnsupportedFormat, "Unsupported video sink");
+}
+
+void FFmpegVideoWriter::onEncodingFinished() {
+    writer.release();
+}
+
+FFmpegVideoWriter::~FFmpegVideoWriter() {
+    onEncodingFinished();
+}
+
+void FFmpegVideoWriter::onEncoded(const std::vector<std::vector<uint8_t>>& vPacket, const std::vector<uint64_t>& pts) {
+    CV_Assert(vPacket.size() == pts.size());
+    for (int i = 0; i < vPacket.size(); i++){
+        std::vector<uint8_t> packet = vPacket.at(i);
+        Mat wrappedPacket(1, packet.size(), CV_8UC1, (void*)packet.data());
+        const double ptsDouble = static_cast<double>(pts.at(i));
+        CV_Assert(static_cast<uint64_t>(ptsDouble) == pts.at(i));
+#if !defined(WIN32_WAIT_FOR_FFMPEG_WRAPPER_UPDATE)
+        CV_Assert(writer.set(VIDEOWRITER_PROP_PTS, ptsDouble));
+#endif
+        writer.write(wrappedPacket);
+    }
+}
+
+bool FFmpegVideoWriter::setFrameIntervalP(const int frameIntervalP) {
+    return writer.set(VIDEOWRITER_PROP_DTS_DELAY, static_cast<double>(frameIntervalP - 1));
+}
+
+class RawVideoWriter : public EncoderCallback
+{
+public:
+    RawVideoWriter(const String fileName);
+    ~RawVideoWriter();
+    void onEncoded(const std::vector<std::vector<uint8_t>>& vPacket, const std::vector<uint64_t>& pts);
+    void onEncodingFinished();
+    bool setFrameIntervalP(const int) { return false;}
+private:
+    std::ofstream fpOut;
+};
+
+RawVideoWriter::RawVideoWriter(String fileName) {
+    fpOut = std::ofstream(fileName, std::ios::out | std::ios::binary);
+    if (!fpOut)
+        CV_Error(Error::StsError, "Failed to open video file " + fileName + " for writing!");
+}
+
+void RawVideoWriter::onEncodingFinished() {
+    fpOut.close();
+}
+
+RawVideoWriter::~RawVideoWriter() {
+    onEncodingFinished();
+}
+
+void RawVideoWriter::onEncoded(const std::vector<std::vector<uint8_t>>& vPacket, const std::vector<uint64_t>&) {
+    for (auto& packet : vPacket)
+        fpOut.write(reinterpret_cast<const char*>(packet.data()), packet.size());
+}
+
+class VideoWriterImpl : public VideoWriter
+{
+public:
+    VideoWriterImpl(const Ptr<EncoderCallback>& videoWriter, const Size frameSize, const Codec codec, const double fps,
+        const ColorFormat colorFormat, const Stream& stream = Stream::Null());
+    VideoWriterImpl(const Ptr<EncoderCallback>& videoWriter, const Size frameSize, const Codec codec, const double fps,
+        const ColorFormat colorFormat, const EncoderParams& encoderParams, const Stream& stream = Stream::Null());
+    ~VideoWriterImpl();
+    void write(InputArray frame);
+    EncoderParams getEncoderParams() const;
+    void release();
+private:
+    void Init(const Codec codec, const double fps, const Size frameSz);
+    void InitializeEncoder(const GUID codec, const double fps);
+    void CopyToNvSurface(const InputArray src);
+
+    Ptr<EncoderCallback> encoderCallback;
+    ColorFormat colorFormat = ColorFormat::UNDEFINED;
+    NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT::NV_ENC_BUFFER_FORMAT_UNDEFINED;
+    EncoderParams encoderParams;
+    Stream stream = Stream::Null();
+    Ptr<NvEncoderCuda> pEnc;
+    std::vector<std::vector<uint8_t>> vPacket;
+    int nSrcChannels = 0;
+    CUcontext cuContext;
+};
+
+NV_ENC_BUFFER_FORMAT EncBufferFormat(const ColorFormat colorFormat) {
+    switch (colorFormat) {
+    case ColorFormat::BGR: return NV_ENC_BUFFER_FORMAT_ARGB;
+    case ColorFormat::RGB: return NV_ENC_BUFFER_FORMAT_ABGR;
+    case ColorFormat::BGRA: return NV_ENC_BUFFER_FORMAT_ARGB;
+    case ColorFormat::RGBA: return NV_ENC_BUFFER_FORMAT_ABGR;
+    case ColorFormat::GRAY:
+    case ColorFormat::NV_NV12: return NV_ENC_BUFFER_FORMAT_NV12;
+    case ColorFormat::NV_YV12: return NV_ENC_BUFFER_FORMAT_YV12;
+    case ColorFormat::NV_IYUV: return NV_ENC_BUFFER_FORMAT_IYUV;
+    case ColorFormat::NV_YUV444: return NV_ENC_BUFFER_FORMAT_YUV444;
+    case ColorFormat::NV_AYUV: return NV_ENC_BUFFER_FORMAT_AYUV;
+    default: return NV_ENC_BUFFER_FORMAT_UNDEFINED;
+    }
+}
+
+int NChannels(const ColorFormat colorFormat) {
+    switch (colorFormat) {
+    case ColorFormat::BGR:
+    case ColorFormat::RGB:
+    case ColorFormat::NV_IYUV:
+    case ColorFormat::NV_YUV444: return 3;
+    case ColorFormat::RGBA:
+    case ColorFormat::BGRA:
+    case ColorFormat::NV_AYUV: return 4;
+    case ColorFormat::GRAY:
+    case ColorFormat::NV_NV12:
+    case ColorFormat::NV_YV12: return 1;
+    default: return 0;
+    }
+}
+
+VideoWriterImpl::VideoWriterImpl(const Ptr<EncoderCallback>& encoderCallBack_, const Size frameSz, const Codec codec, const double fps,
+    const ColorFormat colorFormat_, const EncoderParams& encoderParams_, const Stream& stream_) :
+    encoderCallback(encoderCallBack_), colorFormat(colorFormat_), encoderParams(encoderParams_), stream(stream_)
+{
+    CV_Assert(colorFormat != ColorFormat::UNDEFINED);
+    surfaceFormat = EncBufferFormat(colorFormat);
+    if (surfaceFormat == NV_ENC_BUFFER_FORMAT_UNDEFINED) {
+        String msg = cv::format("Unsupported input surface format: %i", colorFormat);
+        CV_LOG_WARNING(NULL, msg);
+        CV_Error(Error::StsUnsupportedFormat, msg);
+    }
+    nSrcChannels = NChannels(colorFormat);
+    Init(codec, fps, frameSz);
+}
+
+void VideoWriterImpl::release() {
+    std::vector<uint64_t> pts;
+    pEnc->EndEncode(vPacket, pts);
+    encoderCallback->onEncoded(vPacket, pts);
+    encoderCallback->onEncodingFinished();
+}
+
+VideoWriterImpl::~VideoWriterImpl() {
+    release();
+}
+
+GUID CodecGuid(const Codec codec) {
+    switch (codec) {
+    case Codec::H264: return NV_ENC_CODEC_H264_GUID;
+    case Codec::HEVC: return NV_ENC_CODEC_HEVC_GUID;
+    default: break;
+    }
+    std::string msg = "Unknown codec: cudacodec::VideoWriter only supports CODEC_VW::H264 and CODEC_VW::HEVC";
+    CV_LOG_WARNING(NULL, msg);
+    CV_Error(Error::StsUnsupportedFormat, msg);
+}
+
+void VideoWriterImpl::Init(const Codec codec, const double fps, const Size frameSz) {
+    // init context
+    GpuMat temp(1, 1, CV_8UC1);
+    temp.release();
+    cuSafeCall(cuCtxGetCurrent(&cuContext));
+    CV_Assert(nSrcChannels != 0);
+    const GUID codecGuid = CodecGuid(codec);
+    try {
+        pEnc = new NvEncoderCuda(cuContext, frameSz.width, frameSz.height, surfaceFormat);
+        InitializeEncoder(codecGuid, fps);
+        const cudaStream_t cudaStream = cuda::StreamAccessor::getStream(stream);
+        pEnc->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&cudaStream, (NV_ENC_CUSTREAM_PTR)&cudaStream);
+    }
+    catch (cv::Exception& e)
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     {
     public:
         NVEncoderWrapper() : encoder_(0)
@@ -805,6 +1014,7 @@ namespace
     }
 }
 
+<<<<<<< HEAD
 ///////////////////////////////////////////////////////////////////////////
 // EncoderParams
 
@@ -829,6 +1039,34 @@ cv::cudacodec::EncoderParams::EncoderParams()
     DisableCabac = 0;
     NaluFramingType = 0;
     DisableSPSPPS = 0;
+=======
+void VideoWriterImpl::InitializeEncoder(const GUID codec, const double fps)
+{
+    NV_ENC_INITIALIZE_PARAMS initializeParams = {};
+    initializeParams.version = NV_ENC_INITIALIZE_PARAMS_VER;
+    NV_ENC_CONFIG encodeConfig = {};
+    encodeConfig.version = NV_ENC_CONFIG_VER;
+    initializeParams.encodeConfig = &encodeConfig;
+    pEnc->CreateDefaultEncoderParams(&initializeParams, codec, EncodingPresetGuid(encoderParams.nvPreset), (NV_ENC_TUNING_INFO)encoderParams.tuningInfo);
+    FrameRate(fps, initializeParams.frameRateNum, initializeParams.frameRateDen);
+    initializeParams.encodeConfig->profileGUID = EncodingProfileGuid(encoderParams.encodingProfile);
+    initializeParams.encodeConfig->rcParams.rateControlMode = (NV_ENC_PARAMS_RC_MODE)(encoderParams.rateControlMode + encoderParams.multiPassEncoding);
+    initializeParams.encodeConfig->rcParams.constQP = { encoderParams.constQp.qpInterB, encoderParams.constQp.qpInterB,encoderParams.constQp.qpInterB };
+    initializeParams.encodeConfig->rcParams.averageBitRate = encoderParams.averageBitRate;
+    initializeParams.encodeConfig->rcParams.maxBitRate = encoderParams.maxBitRate;
+    initializeParams.encodeConfig->rcParams.targetQuality = encoderParams.targetQuality;
+    initializeParams.encodeConfig->gopLength = encoderParams.gopLength;
+#if !defined(WIN32_WAIT_FOR_FFMPEG_WRAPPER_UPDATE)
+    if (initializeParams.encodeConfig->frameIntervalP > 1) {
+        CV_Assert(encoderCallback->setFrameIntervalP(initializeParams.encodeConfig->frameIntervalP));
+    }
+#endif
+    if (codec == NV_ENC_CODEC_H264_GUID)
+        initializeParams.encodeConfig->encodeCodecConfig.h264Config.idrPeriod = encoderParams.idrPeriod;
+    else if (codec == NV_ENC_CODEC_HEVC_GUID)
+        initializeParams.encodeConfig->encodeCodecConfig.hevcConfig.idrPeriod = encoderParams.idrPeriod;
+    pEnc->CreateEncoder(&initializeParams);
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
 cv::cudacodec::EncoderParams::EncoderParams(const String& configFile)
@@ -836,6 +1074,7 @@ cv::cudacodec::EncoderParams::EncoderParams(const String& configFile)
     load(configFile);
 }
 
+<<<<<<< HEAD
 void cv::cudacodec::EncoderParams::load(const String& configFile)
 {
     FileStorage fs(configFile, FileStorage::READ);
@@ -860,10 +1099,29 @@ void cv::cudacodec::EncoderParams::load(const String& configFile)
     read(fs["DisableCabac"   ], DisableCabac, 0);
     read(fs["NaluFramingType"], NaluFramingType, 0);
     read(fs["DisableSPSPPS"  ], DisableSPSPPS, 0);
+=======
+void VideoWriterImpl::write(const InputArray frame) {
+    CV_Assert(frame.channels() == nSrcChannels);
+    CopyToNvSurface(frame);
+    std::vector<uint64_t> pts;
+    pEnc->EncodeFrame(vPacket, pts);
+    encoderCallback->onEncoded(vPacket, pts);
+};
+
+EncoderParams VideoWriterImpl::getEncoderParams() const {
+    return encoderParams;
+};
+
+Ptr<VideoWriter> createVideoWriter(const String& fileName, const Size frameSize, const Codec codec, const double fps, const ColorFormat colorFormat,
+    Ptr<EncoderCallback> encoderCallback, const Stream& stream)
+{
+    return createVideoWriter(fileName, frameSize, codec, fps, colorFormat, EncoderParams(), encoderCallback, stream);
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
 void cv::cudacodec::EncoderParams::save(const String& configFile) const
 {
+<<<<<<< HEAD
     FileStorage fs(configFile, FileStorage::WRITE);
     CV_Assert( fs.isOpened() );
 
@@ -886,6 +1144,19 @@ void cv::cudacodec::EncoderParams::save(const String& configFile) const
     write(fs, "DisableCabac"   , DisableCabac);
     write(fs, "NaluFramingType", NaluFramingType);
     write(fs, "DisableSPSPPS"  , DisableSPSPPS);
+=======
+    CV_Assert(params.idrPeriod >= params.gopLength);
+    if (!encoderCallback) {
+        try {
+            encoderCallback = new FFmpegVideoWriter(fileName, codec, fps, frameSize, params.idrPeriod);
+        }
+        catch (...)
+        {
+            encoderCallback = new RawVideoWriter(fileName);
+        }
+    }
+    return makePtr<VideoWriterImpl>(encoderCallback, frameSize, codec, fps, colorFormat, params, stream);
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
 ///////////////////////////////////////////////////////////////////////////

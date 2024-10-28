@@ -35,7 +35,8 @@ public:
      * @param points succussfully decoded qrcode with bounding box points.
      * @return vector<string>
      */
-    std::vector<std::string> decode(const Mat& img, std::vector<Mat>& candidate_points,
+    std::vector<std::string> decode(const Mat& img,
+                                    const std::vector<Mat>& candidate_points,
                                     std::vector<Mat>& points);
     int applyDetector(const Mat& img, std::vector<Mat>& points);
     Mat cropObj(const Mat& img, const Mat& point, Align& aligner);
@@ -111,13 +112,14 @@ vector<string> WeChatQRCode::detectAndDecode(InputArray img, OutputArrayOfArrays
     return ret;
 };
 
-vector<string> WeChatQRCode::Impl::decode(const Mat& img, vector<Mat>& candidate_points,
+vector<string> WeChatQRCode::Impl::decode(const Mat& img,
+                                          const vector<Mat>& candidate_points,
                                           vector<Mat>& points) {
     if (candidate_points.size() == 0) {
         return vector<string>();
     }
     vector<string> decode_results;
-    for (auto& point : candidate_points) {
+    for (const auto& point : candidate_points) {
         Mat cropped_img;
         if (use_nn_detector_) {
             Align aligner;
@@ -134,9 +136,43 @@ vector<string> WeChatQRCode::Impl::decode(const Mat& img, vector<Mat>& candidate
             DecoderMgr decodemgr;
             auto ret = decodemgr.decodeImage(scaled_img, use_nn_detector_, result);
 
+<<<<<<< HEAD
             if (ret == 0) {
                 decode_results.push_back(result);
                 points.push_back(point);
+=======
+                    if (use_nn_detector_)
+                        points_qr = aligner.warpBack(points_qr);
+
+                    auto point_to_save = Mat(4, 2, CV_32FC1);
+                    for (int j = 0; j < 4; ++j) {
+                        point_to_save.at<float>(j, 0) = points_qr[j].x;
+                        point_to_save.at<float>(j, 1) = points_qr[j].y;
+                    }
+                    // try to find duplicate qr corners
+                    bool isDuplicate = false;
+                    for (const auto &tmp_points: check_points) {
+                        const float eps = 10.f;
+                        for (size_t j = 0; j < tmp_points.size(); j++) {
+                            if (abs(tmp_points[j].x - points_qr[j].x) < eps &&
+                                abs(tmp_points[j].y - points_qr[j].y) < eps) {
+                                isDuplicate = true;
+                            }
+                            else {
+                                isDuplicate = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (isDuplicate == false) {
+                        points.push_back(point_to_save);
+                        check_points.push_back(points_qr);
+                    }
+                    else {
+                        decode_results.erase(decode_results.begin() + i, decode_results.begin() + i + 1);
+                    }
+                }
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
                 break;
             }
         }

@@ -56,7 +56,13 @@ public:
     virtual ~VideoSource() {}
 
     virtual FormatInfo format() const = 0;
+<<<<<<< HEAD
     virtual void updateFormat(const int codedWidth, const int codedHeight) = 0;
+=======
+    virtual void updateFormat(const FormatInfo& videoFormat) = 0;
+    virtual bool get(const int propertyId, double& propertyVal) const { return false; }
+    virtual int getFirstFrameIdx() const { return 0; }
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     virtual void start() = 0;
     virtual void stop() = 0;
     virtual bool isStarted() const = 0;
@@ -77,7 +83,13 @@ public:
     RawVideoSourceWrapper(const Ptr<RawVideoSource>& source);
 
     FormatInfo format() const CV_OVERRIDE;
+<<<<<<< HEAD
     void updateFormat(const int codedWidth, const int codedHeight) CV_OVERRIDE;
+=======
+    void updateFormat(const FormatInfo& videoFormat) CV_OVERRIDE;
+    bool get(const int propertyId, double& propertyVal) const CV_OVERRIDE;
+    int getFirstFrameIdx() const CV_OVERRIDE;
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     void start() CV_OVERRIDE;
     void stop() CV_OVERRIDE;
     bool isStarted() const CV_OVERRIDE;

@@ -71,6 +71,7 @@ Codec FourccToCodec(int codec)
 {
     switch (codec)
     {
+<<<<<<< HEAD
     case CV_FOURCC_MACRO('m', 'p', 'e', 'g'): // fallthru
     case CV_FOURCC_MACRO('M', 'P', 'G', '1'): return MPEG1;
     case CV_FOURCC_MACRO('M', 'P', 'G', '2'): return MPEG2;
@@ -82,6 +83,13 @@ Codec FourccToCodec(int codec)
     case CV_FOURCC_MACRO('a', 'v', 'c', '1'): return H264;
     case CV_FOURCC_MACRO('H', '2', '6', '5'): // fallthru
     case CV_FOURCC_MACRO('h', '2', '6', '5'): // fallthru
+=======
+    case CV_FOURCC_MACRO('m', 'p', 'g', '1'): return MPEG1;
+    case CV_FOURCC_MACRO('m', 'p', 'g', '2'): return MPEG2;
+    case CV_FOURCC_MACRO('F', 'M', 'P', '4'): return MPEG4;
+    case CV_FOURCC_MACRO('W', 'V', 'C', '1'): return VC1;
+    case CV_FOURCC_MACRO('h', '2', '6', '4'): return H264;
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     case CV_FOURCC_MACRO('h', 'e', 'v', 'c'): return HEVC;
     case CV_FOURCC_MACRO('M', 'J', 'P', 'G'): return JPEG;
     case CV_FOURCC_MACRO('V', 'P', '8', '0'): return VP8;
@@ -112,18 +120,47 @@ void FourccToChromaFormat(const int pixelFormat, ChromaFormat &chromaFormat, int
     }
 }
 
+<<<<<<< HEAD
 cv::cudacodec::detail::FFmpegVideoSource::FFmpegVideoSource(const String& fname)
+=======
+static
+int StartCodeLen(unsigned char* data, const int sz) {
+    if (sz >= 3 && data[0] == 0 && data[1] == 0 && data[2] == 1)
+        return 3;
+    else if (sz >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == 1)
+        return 4;
+    else
+        return 0;
+}
+
+bool ParamSetsExist(unsigned char* parameterSets, const int szParameterSets, unsigned char* data, const int szData) {
+    const int paramSetStartCodeLen = StartCodeLen(parameterSets, szParameterSets);
+    const int packetStartCodeLen = StartCodeLen(data, szData);
+    // weak test to see if the parameter set has already been included in the RTP stream
+    return paramSetStartCodeLen != 0 && packetStartCodeLen != 0 && parameterSets[paramSetStartCodeLen] == data[packetStartCodeLen];
+}
+
+cv::cudacodec::detail::FFmpegVideoSource::FFmpegVideoSource(const String& fname, const std::vector<int>& _videoCaptureParams, const int iMaxStartFrame)
+    : videoCaptureParams(_videoCaptureParams)
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 {
     if (!videoio_registry::hasBackend(CAP_FFMPEG))
         CV_Error(Error::StsNotImplemented, "FFmpeg backend not found");
 
+<<<<<<< HEAD
     cap.open(fname, CAP_FFMPEG);
     if (!cap.isOpened())
+=======
+    videoCaptureParams.push_back(CAP_PROP_FORMAT);
+    videoCaptureParams.push_back(-1);
+    if (!cap.open(fname, CAP_FFMPEG, videoCaptureParams))
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
         CV_Error(Error::StsUnsupportedFormat, "Unsupported video source");
-
-    if (!cap.set(CAP_PROP_FORMAT, -1))  // turn off video decoder (extract stream)
-        CV_Error(Error::StsUnsupportedFormat, "Fetching of RAW video streams is not supported");
     CV_Assert(cap.get(CAP_PROP_FORMAT) == -1);
+    if (iMaxStartFrame) {
+        CV_Assert(cap.set(CAP_PROP_POS_FRAMES, iMaxStartFrame));
+        firstFrameIdx = static_cast<int>(cap.get(CAP_PROP_POS_FRAMES));
+    }
 
     int codec = (int)cap.get(CAP_PROP_FOURCC);
     int pixelFormat = (int)cap.get(CAP_PROP_CODEC_PIXEL_FORMAT);

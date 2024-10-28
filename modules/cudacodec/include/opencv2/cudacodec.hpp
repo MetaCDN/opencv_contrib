@@ -265,7 +265,207 @@ enum Codec
     Uncompressed_UYVY   = (('U'<<24)|('Y'<<16)|('V'<<8)|('Y'))    //!< UYVY (4:2:2)
 };
 
+<<<<<<< HEAD
 /** @brief Chroma formats supported by cudacodec::VideoReader .
+=======
+/** @brief ColorFormat for the frame returned by VideoReader::nextFrame() and VideoReader::retrieve() or used to initialize a VideoWriter.
+*/
+enum class ColorFormat {
+    UNDEFINED = 0,
+    BGRA = 1, //!< OpenCV color format, can be used with both VideoReader and VideoWriter.
+    BGR = 2, //!< OpenCV color format, can be used with both VideoReader and VideoWriter.
+    GRAY = 3, //!< OpenCV color format, can be used with both VideoReader and VideoWriter.
+    NV_NV12 = 4, //!< Nvidia color format - equivalent to YUV - Semi-Planar YUV [Y plane followed by interleaved UV plane], can be used with both VideoReader and VideoWriter.
+
+    RGB = 5, //!< OpenCV color format, can only be used with VideoWriter.
+    RGBA = 6, //!< OpenCV color format, can only be used with VideoWriter.
+    NV_YV12 = 8, //!< Nvidia Buffer Format - Planar YUV [Y plane followed by V and U planes], use with VideoReader, can only be used with VideoWriter.
+    NV_IYUV = 9, //!< Nvidia Buffer Format - Planar YUV [Y plane followed by U and V planes], use with VideoReader, can only be used with VideoWriter.
+    NV_YUV444 = 10, //!< Nvidia Buffer Format - Planar YUV [Y plane followed by U and V planes], use with VideoReader, can only be used with VideoWriter.
+    NV_AYUV = 11, //!< Nvidia Buffer Format - 8 bit Packed A8Y8U8V8. This is a word-ordered format where a pixel is represented by a 32-bit word with V in the lowest 8 bits, U in the next 8 bits, Y in the 8 bits after that and A in the highest 8 bits, can only be used with VideoWriter.
+#ifndef CV_DOXYGEN
+    PROP_NOT_SUPPORTED
+#endif
+};
+
+/** @brief Rate Control Modes.
+*/
+enum EncodeParamsRcMode {
+    ENC_PARAMS_RC_CONSTQP = 0x0, //!< Constant QP mode.
+    ENC_PARAMS_RC_VBR = 0x1, //!< Variable bitrate mode.
+    ENC_PARAMS_RC_CBR = 0x2 //!< Constant bitrate mode.
+};
+
+/** @brief Multi Pass Encoding.
+*/
+enum EncodeMultiPass
+{
+    ENC_MULTI_PASS_DISABLED = 0x0, //!< Single Pass.
+    ENC_TWO_PASS_QUARTER_RESOLUTION = 0x1, //!< Two Pass encoding is enabled where first Pass is quarter resolution.
+    ENC_TWO_PASS_FULL_RESOLUTION = 0x2, //!< Two Pass encoding is enabled where first Pass is full resolution.
+};
+
+
+/** @brief Supported Encoder Profiles.
+*/
+enum EncodeProfile {
+    ENC_CODEC_PROFILE_AUTOSELECT = 0,
+    ENC_H264_PROFILE_BASELINE = 1,
+    ENC_H264_PROFILE_MAIN = 2,
+    ENC_H264_PROFILE_HIGH = 3,
+    ENC_H264_PROFILE_HIGH_444 = 4,
+    ENC_H264_PROFILE_STEREO = 5,
+    ENC_H264_PROFILE_PROGRESSIVE_HIGH = 6,
+    ENC_H264_PROFILE_CONSTRAINED_HIGH = 7,
+    ENC_HEVC_PROFILE_MAIN = 8,
+    ENC_HEVC_PROFILE_MAIN10 = 9,
+    ENC_HEVC_PROFILE_FREXT = 10
+};
+
+/** @brief Nvidia Encoding Presets. Performance degrades and quality improves as we move from P1 to P7.
+*/
+enum EncodePreset {
+    ENC_PRESET_P1 = 1,
+    ENC_PRESET_P2 = 2,
+    ENC_PRESET_P3 = 3,
+    ENC_PRESET_P4 = 4,
+    ENC_PRESET_P5 = 5,
+    ENC_PRESET_P6 = 6,
+    ENC_PRESET_P7 = 7
+};
+
+/** @brief Tuning information.
+*/
+enum EncodeTuningInfo {
+    ENC_TUNING_INFO_UNDEFINED = 0, //!< Undefined tuningInfo. Invalid value for encoding.
+    ENC_TUNING_INFO_HIGH_QUALITY = 1, //!< Tune presets for latency tolerant encoding.
+    ENC_TUNING_INFO_LOW_LATENCY = 2, //!< Tune presets for low latency streaming.
+    ENC_TUNING_INFO_ULTRA_LOW_LATENCY = 3, //!< Tune presets for ultra low latency streaming.
+    ENC_TUNING_INFO_LOSSLESS = 4, //!< Tune presets for lossless encoding.
+    ENC_TUNING_INFO_COUNT
+};
+
+/** Quantization Parameter for each type of frame when using ENC_PARAMS_RC_MODE::ENC_PARAMS_RC_CONSTQP.
+*/
+struct CV_EXPORTS_W_SIMPLE EncodeQp
+{
+    CV_PROP_RW uint32_t qpInterP; //!< Specifies QP value for P-frame.
+    CV_PROP_RW uint32_t qpInterB; //!< Specifies QP value for B-frame.
+    CV_PROP_RW uint32_t qpIntra; //!< Specifies QP value for Intra Frame.
+};
+
+/** @brief Different parameters for CUDA video encoder.
+*/
+struct CV_EXPORTS_W_SIMPLE EncoderParams
+{
+public:
+    CV_WRAP EncoderParams() : nvPreset(ENC_PRESET_P3), tuningInfo(ENC_TUNING_INFO_HIGH_QUALITY), encodingProfile(ENC_CODEC_PROFILE_AUTOSELECT),
+        rateControlMode(ENC_PARAMS_RC_VBR), multiPassEncoding(ENC_MULTI_PASS_DISABLED), constQp({ 0,0,0 }), averageBitRate(0), maxBitRate(0),
+        targetQuality(30), gopLength(250), idrPeriod(250) {};
+    CV_PROP_RW EncodePreset nvPreset;
+    CV_PROP_RW EncodeTuningInfo tuningInfo;
+    CV_PROP_RW EncodeProfile encodingProfile;
+    CV_PROP_RW EncodeParamsRcMode rateControlMode;
+    CV_PROP_RW EncodeMultiPass multiPassEncoding;
+    CV_PROP_RW EncodeQp constQp; //!< QP's for \ref ENC_PARAMS_RC_CONSTQP.
+    CV_PROP_RW int averageBitRate; //!< target bitrate for \ref ENC_PARAMS_RC_VBR and \ref ENC_PARAMS_RC_CBR.
+    CV_PROP_RW int maxBitRate; //!< upper bound on bitrate for \ref ENC_PARAMS_RC_VBR and \ref ENC_PARAMS_RC_CONSTQP.
+    CV_PROP_RW uint8_t targetQuality; //!< value 0 - 51 where video quality decreases as targetQuality increases, used with \ref ENC_PARAMS_RC_VBR.
+    CV_PROP_RW int gopLength; //!< the number of pictures in one GOP, ensuring \ref idrPeriod >= \ref gopLength.
+    CV_PROP_RW int idrPeriod; //!< IDR interval, ensuring \ref idrPeriod >= \ref gopLength.
+};
+CV_EXPORTS bool operator==(const EncoderParams& lhs, const EncoderParams& rhs);
+
+/** @brief Interface for encoder callbacks.
+
+User can implement own multiplexing by implementing this interface.
+*/
+class CV_EXPORTS_W EncoderCallback {
+public:
+    /** @brief Callback function to signal that the encoded bitstream for one or more frames is ready.
+
+    @param vPacket The raw bitstream for one or more frames.
+    @param pts Presentation timestamps for each frame in vPacket using the FPS time base.  e.g. fps = 25, pts = 3, presentation time = 3/25 seconds.
+    */
+    virtual void onEncoded(const std::vector<std::vector<uint8_t>>& vPacket, const std::vector<uint64_t>& pts) = 0;
+
+    /** @brief Set the GOP pattern used by the encoder.
+
+     @param frameIntervalP Specify the GOP pattern as follows : \p frameIntervalP = 0: I, 1 : IPP, 2 : IBP, 3 : IBBP.
+    */
+    virtual bool setFrameIntervalP(const int frameIntervalP) = 0;
+
+    /** @brief Callback function to that the encoding has finished.
+    * */
+    virtual void onEncodingFinished() = 0;
+
+    virtual ~EncoderCallback() {}
+};
+
+/** @brief Video writer interface, see createVideoWriter().
+
+Available if Nvidia's Video Codec SDK is installed.
+
+Only Codec::H264 and Codec::HEVC are supported with encoding support dependent on the GPU, refer to the Nvidia Video Codec SDK Video Encode and Decode GPU Support Matrix for details.
+
+@note
+   -   An example on how to use the VideoWriter class can be found at
+        opencv_source_code/samples/gpu/video_writer.cpp
+*/
+class CV_EXPORTS_W VideoWriter
+{
+public:
+    virtual ~VideoWriter() {}
+
+    /** @brief Writes the next video frame.
+
+    @param frame The framet to be written.
+
+    The method encodes the specified image to a video stream. The image must have the same size and the same
+    surface format as has been specified when opening the video writer.
+    */
+    CV_WRAP virtual void write(InputArray frame) = 0;
+
+    /** @brief Retrieve the encoding parameters.
+    */
+    CV_WRAP virtual EncoderParams getEncoderParams() const = 0;
+
+    /** @brief Waits until the encoding process has finished before calling EncoderCallback::onEncodingFinished().
+    */
+    CV_WRAP virtual void release() = 0;
+};
+
+/** @brief Creates video writer.
+
+@param fileName Name of the output video file.
+@param frameSize Size of the input video frames.
+@param codec Supports Codec::H264 and Codec::HEVC.
+@param fps Framerate of the created video stream.
+@param colorFormat OpenCv color format of the frames to be encoded.
+@param encoderCallback Callbacks for video encoder. See cudacodec::EncoderCallback. Required for working with the encoded video stream.
+@param stream Stream for frame pre-processing.
+*/
+CV_EXPORTS_W Ptr<cudacodec::VideoWriter> createVideoWriter(const String& fileName, const Size frameSize, const Codec codec = Codec::H264, const double fps = 25.0,
+    const ColorFormat colorFormat = ColorFormat::BGR, Ptr<EncoderCallback> encoderCallback = 0, const cuda::Stream& stream = cuda::Stream::Null());
+
+/** @brief Creates video writer.
+
+@param fileName Name of the output video file.
+@param frameSize Size of the input video frames.
+@param codec Supports Codec::H264 and Codec::HEVC.
+@param fps Framerate of the created video stream.
+@param colorFormat OpenCv color format of the frames to be encoded.
+@param params Additional encoding parameters.
+@param encoderCallback Callbacks for video encoder. See cudacodec::EncoderCallback. Required for working with the encoded video stream.
+@param stream Stream for frame pre-processing.
+*/
+CV_EXPORTS_W Ptr<cudacodec::VideoWriter> createVideoWriter(const String& fileName, const Size frameSize, const Codec codec, const double fps,  const ColorFormat colorFormat,
+    const EncoderParams& params, Ptr<EncoderCallback> encoderCallback = 0, const cuda::Stream& stream = cuda::Stream::Null());
+
+////////////////////////////////// Video Decoding //////////////////////////////////////////
+
+/** @brief Chroma formats supported by cudacodec::VideoReader.
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
  */
 enum ChromaFormat
 {
@@ -289,10 +489,17 @@ struct FormatInfo
     bool valid = false;
 };
 
-/** @brief Video reader interface.
+/** @brief Video reader interface, see createVideoReader().
 
+<<<<<<< HEAD
+=======
+Available if Nvidia's Video Codec SDK is installed.
+
+Decoding support is dependent on the GPU, refer to the Nvidia Video Codec SDK Video Encode and Decode GPU Support Matrix for details.
+
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 @note
-   -   An example on how to use the videoReader class can be found at
+   -   An example on how to use the VideoReader interface can be found at
         opencv_source_code/samples/gpu/video_reader.cpp
  */
 class CV_EXPORTS_W VideoReader
@@ -334,7 +541,65 @@ public:
 
     /** @brief Updates the coded width and height inside format.
     */
+<<<<<<< HEAD
     virtual void updateFormat(const int codedWidth, const int codedHeight) = 0;
+=======
+    virtual void updateFormat(const FormatInfo& videoFormat) = 0;
+
+    /** @brief Returns any extra data associated with the video source.
+
+    @param extraData 1D cv::Mat containing the extra data if it exists.
+     */
+    virtual void getExtraData(cv::Mat& extraData) const = 0;
+
+    /** @brief Retrieves the specified property used by the VideoSource.
+
+    @param propertyId Property identifier from cv::VideoCaptureProperties (eg. cv::CAP_PROP_POS_MSEC, cv::CAP_PROP_POS_FRAMES, ...)
+    or one from @ref videoio_flags_others.
+    @param propertyVal Value for the specified property.
+
+    @return `true` unless the property is unset set or not supported.
+     */
+    virtual bool get(const int propertyId, double& propertyVal) const = 0;
+
+    /** @brief Retrieve the index of the first frame that will returned after construction.
+
+    @return index of the index of the first frame that will returned after construction.
+
+    @note To reduce the decoding overhead when initializing VideoReader to start its decoding from frame N, RawVideoSource should seek to the first valid key frame less than or equal to N and return that index here.
+     */
+    virtual int getFirstFrameIdx() const = 0;
+};
+
+/** @brief VideoReader initialization parameters
+@param udpSource Remove validation which can cause VideoReader() to throw exceptions when reading from a UDP source.
+@param allowFrameDrop Allow frames to be dropped when ingesting from a live capture source to prevent delay and eventual disconnection
+when calls to nextFrame()/grab() cannot keep up with the source's fps.  Only use if delay and disconnection are a problem, i.e. not when decoding from
+video files where setting this flag will cause frames to be unnecessarily discarded.
+@param minNumDecodeSurfaces Minimum number of internal decode surfaces used by the hardware decoder.  NVDEC will automatically determine the minimum number of
+surfaces it requires for correct functionality and optimal video memory usage but not necessarily for best performance, which depends on the design of the
+overall application. The optimal number of decode surfaces (in terms of performance and memory utilization) should be decided by experimentation for each application,
+but it cannot go below the number determined by NVDEC.
+@param rawMode Allow the raw encoded data which has been read up until the last call to grab() to be retrieved by calling retrieve(rawData,RAW_DATA_IDX).
+@param targetSz Post-processed size (width/height should be multiples of 2) of the output frame, defaults to the size of the encoded video source.
+@param srcRoi Region of interest (x/width should be multiples of 4 and y/height multiples of 2) decoded from video source, defaults to the full frame.
+@param targetRoi Region of interest (x/width should be multiples of 4 and y/height multiples of 2) within the output frame to copy and resize the decoded frame to,
+defaults to the full frame.
+@param enableHistogram Request output of decoded luma histogram \a hist from VideoReader::nextFrame(GpuMat& frame, GpuMat& hist, Stream& stream), if hardware supported.
+@param firstFrameIdx Index of the first frame to seek to on initialization of the VideoReader.
+*/
+struct CV_EXPORTS_W_SIMPLE VideoReaderInitParams {
+    CV_WRAP VideoReaderInitParams() : udpSource(false), allowFrameDrop(false), minNumDecodeSurfaces(0), rawMode(0), enableHistogram(false), firstFrameIdx(0){};
+    CV_PROP_RW bool udpSource;
+    CV_PROP_RW bool allowFrameDrop;
+    CV_PROP_RW int minNumDecodeSurfaces;
+    CV_PROP_RW bool rawMode;
+    CV_PROP_RW cv::Size targetSz;
+    CV_PROP_RW cv::Rect srcRoi;
+    CV_PROP_RW cv::Rect targetRoi;
+    CV_PROP_RW bool enableHistogram;
+    CV_PROP_RW int firstFrameIdx;
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 };
 
 /** @brief Creates video reader.

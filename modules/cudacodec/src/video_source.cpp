@@ -70,6 +70,10 @@ void cv::cudacodec::detail::RawVideoSourceWrapper::updateFormat(const int codedW
     source_->updateFormat(codedWidth,codedHeight);
 }
 
+int cv::cudacodec::detail::RawVideoSourceWrapper::getFirstFrameIdx() const {
+    return source_->getFirstFrameIdx();
+}
+
 void cv::cudacodec::detail::RawVideoSourceWrapper::start()
 {
     stop_ = false;

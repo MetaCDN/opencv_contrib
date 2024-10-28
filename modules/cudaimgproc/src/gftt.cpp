@@ -69,7 +69,8 @@ namespace
                                     int blockSize, bool useHarrisDetector, double harrisK);
 
         void detect(InputArray image, OutputArray corners, InputArray mask, Stream& stream);
-
+        void setMaxCorners(int maxCorners) CV_OVERRIDE { maxCorners_ = maxCorners; }
+        void setMinDistance(double minDistance) CV_OVERRIDE { minDistance_ = minDistance; }
     private:
         int maxCorners_;
         double qualityLevel_;
