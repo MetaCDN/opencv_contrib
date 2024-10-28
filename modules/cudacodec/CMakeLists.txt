@@ -10,22 +10,18 @@ else()
   ocv_warnings_disable(CMAKE_CXX_FLAGS -Wundef -Wshadow -Wsign-compare -Wenum-compare)
 endif()
 
-ocv_add_module(cudacodec opencv_core opencv_videoio OPTIONAL opencv_cudev WRAP python)
+set(required_dependencies opencv_core opencv_videoio opencv_cudaarithm opencv_cudawarping)
+if(HAVE_NVCUVENC)
+  list(APPEND required_dependencies opencv_cudaimgproc)
+endif()
+
+ocv_add_module(cudacodec ${required_dependencies} OPTIONAL opencv_cudev WRAP python)
 
 ocv_module_include_directories()
 ocv_glob_module_sources()
 
 set(extra_libs "")
 
-<<<<<<< HEAD
-if(HAVE_NVCUVID)
-  list(APPEND extra_libs ${CUDA_CUDA_LIBRARY} ${CUDA_nvcuvid_LIBRARY})
-endif()
-
-if(HAVE_NVCUVENC)
-  if(WIN32)
-    list(APPEND extra_libs ${CUDA_nvcuvenc_LIBRARY})
-=======
 if(WITH_NVCUVID AND NOT HAVE_NVCUVID)
   message(WARNING "cudacodec::VideoReader requires Nvidia Video Codec SDK. Please resolve dependency or disable WITH_NVCUVID=OFF")
 endif()
@@ -52,7 +48,6 @@ if(HAVE_NVCUVID OR HAVE_NVCUVENC)
       else()
         list(APPEND extra_libs ${CUDA_nvidia-encode_LIBRARY})
       endif()
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
   endif()
 endif()
 

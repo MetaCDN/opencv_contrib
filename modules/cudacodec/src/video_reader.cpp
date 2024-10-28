@@ -48,12 +48,61 @@ using namespace cv::cudacodec;
 
 #ifndef HAVE_NVCUVID
 
-Ptr<VideoReader> cv::cudacodec::createVideoReader(const String&) { throw_no_cuda(); return Ptr<VideoReader>(); }
-Ptr<VideoReader> cv::cudacodec::createVideoReader(const Ptr<RawVideoSource>&) { throw_no_cuda(); return Ptr<VideoReader>(); }
+Ptr<VideoReader> cv::cudacodec::createVideoReader(const String&, const std::vector<int>&, const VideoReaderInitParams) { throw_no_cuda(); return Ptr<VideoReader>(); }
+Ptr<VideoReader> cv::cudacodec::createVideoReader(const Ptr<RawVideoSource>&, const VideoReaderInitParams) { throw_no_cuda(); return Ptr<VideoReader>(); }
+void cv::cudacodec::MapHist(const GpuMat&, Mat&) { throw_no_cuda(); }
 
 #else // HAVE_NVCUVID
 
-void videoDecPostProcessFrame(const GpuMat& decodedFrame, GpuMat& _outFrame, int width, int height, cudaStream_t stream);
+void nv12ToBgra(const GpuMat& decodedFrame, GpuMat& outFrame, int width, int height, const bool videoFullRangeFlag, cudaStream_t stream);
+bool ValidColorFormat(const ColorFormat colorFormat);
+
+void cvtFromNv12(const GpuMat& decodedFrame, GpuMat& outFrame, int width, int height, const ColorFormat colorFormat, const bool videoFullRangeFlag,
+    Stream stream)
+{
+    CV_Assert(decodedFrame.cols == width && decodedFrame.rows == height * 1.5f);
+    if (colorFormat == ColorFormat::BGRA) {
+        nv12ToBgra(decodedFrame, outFrame, width, height, videoFullRangeFlag, StreamAccessor::getStream(stream));
+    }
+    else if (colorFormat == ColorFormat::BGR) {
+        outFrame.create(height, width, CV_8UC3);
+        Npp8u* pSrc[2] = { decodedFrame.data, &decodedFrame.data[decodedFrame.step * height] };
+        NppiSize oSizeROI = { width,height };
+#if (CUDART_VERSION < 10010)
+        cv::cuda::NppStreamHandler h(stream);
+        if (videoFullRangeFlag)
+            nppSafeCall(nppiNV12ToBGR_709HDTV_8u_P2C3R(pSrc, decodedFrame.step, outFrame.data, outFrame.step, oSizeROI));
+        else {
+            nppSafeCall(nppiNV12ToBGR_8u_P2C3R(pSrc, decodedFrame.step, outFrame.data, outFrame.step, oSizeROI));
+        }
+#elif (CUDART_VERSION >= 10010)
+        NppStreamContext nppStreamCtx;
+        nppSafeCall(nppGetStreamContext(&nppStreamCtx));
+        nppStreamCtx.hStream = StreamAccessor::getStream(stream);
+        if (videoFullRangeFlag)
+            nppSafeCall(nppiNV12ToBGR_709HDTV_8u_P2C3R_Ctx(pSrc, decodedFrame.step, outFrame.data, outFrame.step, oSizeROI, nppStreamCtx));
+        else {
+#if (CUDART_VERSION < 11000)
+            nppSafeCall(nppiNV12ToBGR_8u_P2C3R_Ctx(pSrc, decodedFrame.step, outFrame.data, outFrame.step, oSizeROI, nppStreamCtx));
+#else
+            nppSafeCall(nppiNV12ToBGR_709CSC_8u_P2C3R_Ctx(pSrc, decodedFrame.step, outFrame.data, outFrame.step, oSizeROI, nppStreamCtx));
+#endif
+        }
+#endif
+    }
+    else if (colorFormat == ColorFormat::GRAY) {
+        outFrame.create(height, width, CV_8UC1);
+        if(videoFullRangeFlag)
+            cudaSafeCall(cudaMemcpy2DAsync(outFrame.ptr(), outFrame.step, decodedFrame.ptr(), decodedFrame.step, width, height, cudaMemcpyDeviceToDevice, StreamAccessor::getStream(stream)));
+        else {
+            cv::cuda::subtract(decodedFrame(Rect(0,0,width,height)), 16, outFrame, noArray(), CV_8U, stream);
+            cv::cuda::multiply(outFrame, 255.0f / 219.0f, outFrame, 1.0, CV_8U, stream);
+        }
+    }
+    else if (colorFormat == ColorFormat::NV_NV12) {
+        decodedFrame.copyTo(outFrame, stream);
+    }
+}
 
 using namespace cv::cudacodec::detail;
 
@@ -62,39 +111,45 @@ namespace
     class VideoReaderImpl : public VideoReader
     {
     public:
-<<<<<<< HEAD
-        explicit VideoReaderImpl(const Ptr<VideoSource>& source);
-=======
         explicit VideoReaderImpl(const Ptr<VideoSource>& source, const int minNumDecodeSurfaces, const bool allowFrameDrop = false , const bool udpSource = false,
             const Size targetSz = Size(), const Rect srcRoi = Rect(), const Rect targetRoi = Rect(), const bool enableHistogram = false, const int firstFrameIdx = 0);
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
         ~VideoReaderImpl();
 
         bool nextFrame(GpuMat& frame, Stream& stream) CV_OVERRIDE;
 
+        bool nextFrame(GpuMat& frame, GpuMat& histogram, Stream& stream) CV_OVERRIDE;
+
         FormatInfo format() const CV_OVERRIDE;
 
+        bool grab(Stream& stream) CV_OVERRIDE;
+
+        bool retrieve(OutputArray frame, const size_t idx) const CV_OVERRIDE;
+
+        bool set(const VideoReaderProps propertyId, const double propertyVal) CV_OVERRIDE;
+
+        bool set(const ColorFormat colorFormat_) CV_OVERRIDE;
+
+        bool get(const VideoReaderProps propertyId, double& propertyVal) const CV_OVERRIDE;
+        bool getVideoReaderProps(const VideoReaderProps propertyId, double& propertyValOut, double propertyValIn) const CV_OVERRIDE;
+
+        bool get(const int propertyId, double& propertyVal) const CV_OVERRIDE;
+
     private:
-<<<<<<< HEAD
-=======
         bool skipFrame();
         bool aquireFrameInfo(std::pair<CUVIDPARSERDISPINFO, CUVIDPROCPARAMS>& frameInfo, Stream& stream = Stream::Null());
         void releaseFrameInfo(const std::pair<CUVIDPARSERDISPINFO, CUVIDPROCPARAMS>& frameInfo);
         bool internalGrab(GpuMat & frame, GpuMat & histogram, Stream & stream);
         void waitForDecoderInit();
 
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
         Ptr<VideoSource> videoSource_;
 
-        Ptr<FrameQueue> frameQueue_;
-        Ptr<VideoDecoder> videoDecoder_;
-        Ptr<VideoParser> videoParser_;
+        Ptr<FrameQueue> frameQueue_ = 0;
+        Ptr<VideoDecoder> videoDecoder_ = 0;
+        Ptr<VideoParser> videoParser_ = 0;
 
         CUvideoctxlock lock_;
 
         std::deque< std::pair<CUVIDPARSERDISPINFO, CUVIDPROCPARAMS> > frames_;
-<<<<<<< HEAD
-=======
         std::vector<RawPacket> rawPackets;
         GpuMat lastFrame, lastHistogram;
         static const int decodedFrameIdx = 0;
@@ -103,17 +158,15 @@ namespace
         ColorFormat colorFormat = ColorFormat::BGRA;
         static const String errorMsg;
         int iFrame = 0;
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     };
+
+    const String VideoReaderImpl::errorMsg = "Parsing/Decoding video source failed, check GPU memory is available and GPU supports requested functionality.";
 
     FormatInfo VideoReaderImpl::format() const
     {
         return videoSource_->format();
     }
 
-<<<<<<< HEAD
-    VideoReaderImpl::VideoReaderImpl(const Ptr<VideoSource>& source) :
-=======
     void VideoReaderImpl::waitForDecoderInit() {
         for (;;) {
             if (videoDecoder_->inited()) break;
@@ -125,7 +178,6 @@ namespace
 
     VideoReaderImpl::VideoReaderImpl(const Ptr<VideoSource>& source, const int minNumDecodeSurfaces, const bool allowFrameDrop, const bool udpSource,
         const Size targetSz, const Rect srcRoi, const Rect targetRoi, const bool enableHistogram, const int firstFrameIdx) :
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
         videoSource_(source),
         lock_(0)
     {
@@ -136,20 +188,15 @@ namespace
         CUcontext ctx;
         cuSafeCall( cuCtxGetCurrent(&ctx) );
         cuSafeCall( cuvidCtxLockCreate(&lock_, ctx) );
-
-        frameQueue_.reset(new FrameQueue);
-        videoDecoder_.reset(new VideoDecoder(videoSource_->format(), ctx, lock_));
-        videoParser_.reset(new VideoParser(videoDecoder_, frameQueue_));
-
+        frameQueue_.reset(new FrameQueue());
+        videoDecoder_.reset(new VideoDecoder(videoSource_->format().codec, minNumDecodeSurfaces, targetSz, srcRoi, targetRoi, enableHistogram, ctx, lock_));
+        videoParser_.reset(new VideoParser(videoDecoder_, frameQueue_, allowFrameDrop, udpSource));
         videoSource_->setVideoParser(videoParser_);
         videoSource_->start();
-<<<<<<< HEAD
-=======
         waitForDecoderInit();
         for(iFrame = videoSource_->getFirstFrameIdx(); iFrame < firstFrameIdx; iFrame++)
             CV_Assert(skipFrame());
         videoSource_->updateFormat(videoDecoder_->format());
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     }
 
     VideoReaderImpl::~VideoReaderImpl()
@@ -168,26 +215,18 @@ namespace
         CUvideoctxlock m_lock;
     };
 
-<<<<<<< HEAD
-    bool VideoReaderImpl::nextFrame(GpuMat& frame, Stream& stream)
-    {
-        if (videoSource_->hasError() || videoParser_->hasError())
-            CV_Error(Error::StsUnsupportedFormat, "Unsupported video source");
-
-=======
     bool VideoReaderImpl::aquireFrameInfo(std::pair<CUVIDPARSERDISPINFO, CUVIDPROCPARAMS>& frameInfo, Stream& stream) {
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
         if (frames_.empty())
         {
             CUVIDPARSERDISPINFO displayInfo;
-
+            rawPackets.clear();
             for (;;)
             {
-                if (frameQueue_->dequeue(displayInfo))
+                if (frameQueue_->dequeue(displayInfo, rawPackets))
                     break;
 
-                if (videoSource_->hasError() || videoParser_->hasError())
-                    CV_Error(Error::StsUnsupportedFormat, "Unsupported video source");
+                if (videoParser_->hasError())
+                    CV_Error(Error::StsError, errorMsg);
 
                 if (frameQueue_->isEndOfDecode())
                     return false;
@@ -198,10 +237,6 @@ namespace
 
             bool isProgressive = displayInfo.progressive_frame != 0;
             const int num_fields = isProgressive ? 1 : 2 + displayInfo.repeat_first_field;
-<<<<<<< HEAD
-            videoSource_->updateFormat(videoDecoder_->targetWidth(), videoDecoder_->targetHeight());
-=======
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
             for (int active_field = 0; active_field < num_fields; ++active_field)
             {
@@ -247,20 +282,21 @@ namespace
         {
             VideoCtxAutoLock autoLock(lock_);
 
-<<<<<<< HEAD
-=======
             unsigned long long cuHistogramPtr = 0;
             const cudacodec::FormatInfo fmt = videoDecoder_->format();
             if (fmt.enableHistogram)
                 frameInfo.second.histogram_dptr = &cuHistogramPtr;
 
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
             // map decoded video frame to CUDA surface
             GpuMat decodedFrame = videoDecoder_->mapFrame(frameInfo.first.picture_index, frameInfo.second);
 
-            // perform post processing on the CUDA surface (performs colors space conversion and post processing)
-            // comment this out if we include the line of code seen above
-            videoDecPostProcessFrame(decodedFrame, frame, videoDecoder_->targetWidth(), videoDecoder_->targetHeight(), StreamAccessor::getStream(stream));
+            cvtFromNv12(decodedFrame, frame, videoDecoder_->targetWidth(), videoDecoder_->targetHeight(), colorFormat, videoDecoder_->format().videoFullRangeFlag, stream);
+
+            if (fmt.enableHistogram) {
+                const size_t histogramSz = 4 * fmt.nMaxHistogramBins;
+                histogram.create(1, fmt.nMaxHistogramBins, CV_32S);
+                cuSafeCall(cuMemcpyDtoDAsync((CUdeviceptr)(histogram.data), cuHistogramPtr, histogramSz, StreamAccessor::getStream(stream)));
+            }
 
             // unmap video frame
             // unmapFrame() synchronizes with the VideoDecode API (ensures the frame has finished decoding)
@@ -279,8 +315,6 @@ namespace
         releaseFrameInfo(frameInfo);
         return true;
     }
-<<<<<<< HEAD
-=======
 
     bool VideoReaderImpl::grab(Stream& stream) {
         return internalGrab(lastFrame, lastHistogram, stream);
@@ -412,44 +446,30 @@ namespace
             return false;
         return true;
     }
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
-Ptr<VideoReader> cv::cudacodec::createVideoReader(const String& filename)
+Ptr<VideoReader> cv::cudacodec::createVideoReader(const String& filename, const std::vector<int>& sourceParams, const VideoReaderInitParams params)
 {
-    CV_Assert( !filename.empty() );
+    CV_Assert(!filename.empty());
 
     Ptr<VideoSource> videoSource;
     try
     {
         // prefer ffmpeg to cuvidGetSourceVideoFormat() which doesn't always return the corrct raw pixel format
-<<<<<<< HEAD
-        Ptr<RawVideoSource> source(new FFmpegVideoSource(filename));
-        videoSource.reset(new RawVideoSourceWrapper(source));
-=======
         Ptr<RawVideoSource> source(new FFmpegVideoSource(filename, sourceParams, params.firstFrameIdx));
         videoSource.reset(new RawVideoSourceWrapper(source, params.rawMode));
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
     }
     catch (...)
     {
+        if (sourceParams.size()) throw;
         videoSource.reset(new CuvidVideoSource(filename));
     }
-<<<<<<< HEAD
-
-    return makePtr<VideoReaderImpl>(videoSource);
-=======
     return makePtr<VideoReaderImpl>(videoSource, params.minNumDecodeSurfaces, params.allowFrameDrop, params.udpSource, params.targetSz,
         params.srcRoi, params.targetRoi, params.enableHistogram, params.firstFrameIdx);
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
-Ptr<VideoReader> cv::cudacodec::createVideoReader(const Ptr<RawVideoSource>& source)
+Ptr<VideoReader> cv::cudacodec::createVideoReader(const Ptr<RawVideoSource>& source, const VideoReaderInitParams params)
 {
-<<<<<<< HEAD
-    Ptr<VideoSource> videoSource(new RawVideoSourceWrapper(source));
-    return makePtr<VideoReaderImpl>(videoSource);
-=======
     Ptr<VideoSource> videoSource(new RawVideoSourceWrapper(source, params.rawMode));
     return makePtr<VideoReaderImpl>(videoSource, params.minNumDecodeSurfaces, params.allowFrameDrop, params.udpSource, params.targetSz,
         params.srcRoi, params.targetRoi, params.enableHistogram, params.firstFrameIdx);
@@ -465,7 +485,6 @@ void cv::cudacodec::MapHist(const GpuMat& hist, Mat& histFull) {
         const int iHistFull = std::min(std::max(0, static_cast<int>(std::round((iScaled - offset) * scale))), static_cast<int>(histFull.total()) - 1);
         histFull.at<int>(iHistFull) += histHost.at<int>(iScaled);
     }
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 }
 
 #endif // HAVE_NVCUVID

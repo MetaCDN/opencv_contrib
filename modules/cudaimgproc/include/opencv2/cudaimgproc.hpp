@@ -426,6 +426,9 @@ public:
 
     CV_WRAP virtual void setMaxLines(int maxLines) = 0;
     CV_WRAP virtual int getMaxLines() const = 0;
+
+    CV_WRAP virtual void setThreshold(int threshold) = 0;
+    CV_WRAP virtual int getThreshold() const = 0;
 };
 
 /** @brief Creates implementation for cuda::HoughSegmentDetector .
@@ -435,8 +438,10 @@ public:
 @param minLineLength Minimum line length. Line segments shorter than that are rejected.
 @param maxLineGap Maximum allowed gap between points on the same line to link them.
 @param maxLines Maximum number of output lines.
+@param threshold %Accumulator threshold parameter. Only those lines are returned that get enough
+votes ( \f$>\texttt{threshold}\f$ ).
  */
-CV_EXPORTS_W Ptr<HoughSegmentDetector> createHoughSegmentDetector(float rho, float theta, int minLineLength, int maxLineGap, int maxLines = 4096);
+CV_EXPORTS_W Ptr<HoughSegmentDetector> createHoughSegmentDetector(float rho, float theta, int minLineLength, int maxLineGap, int maxLines = 4096, int threshold = -1);
 
 //////////////////////////////////////
 // HoughCircles
@@ -735,8 +740,6 @@ type.
 CV_EXPORTS_W void blendLinear(InputArray img1, InputArray img2, InputArray weights1, InputArray weights2,
                             OutputArray result, Stream& stream = Stream::Null());
 
-<<<<<<< HEAD
-=======
 /////////////////// Connected Components Labeling /////////////////////
 
 //! Connected Components Algorithm
@@ -780,7 +783,6 @@ CV_EXPORTS_AS(connectedComponentsWithAlgorithm) void connectedComponents(InputAr
 CV_EXPORTS_W void connectedComponents(InputArray image, OutputArray labels,
     int connectivity = 8, int ltype = CV_32S);
 
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 //! @}
 
 //! @addtogroup cudaimgproc_shape

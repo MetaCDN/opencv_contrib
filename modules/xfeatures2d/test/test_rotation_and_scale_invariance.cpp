@@ -34,13 +34,10 @@ INSTANTIATE_TEST_CASE_P(BEBLID, DescriptorRotationInvariance, Values(
     make_tuple(IMAGE_TSUKUBA, []() { return SIFT::create(); }, []() { return BEBLID::create(6.75); }, 0.98f)
 ));
 
-<<<<<<< HEAD
-=======
 INSTANTIATE_TEST_CASE_P(TEBLID, DescriptorRotationInvariance, Values(
         make_tuple(IMAGE_TSUKUBA, []() { return SIFT::create(); }, []() { return TEBLID::create(6.75); }, 0.98f)
 ));
 
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 INSTANTIATE_TEST_CASE_P(DAISY, DescriptorRotationInvariance, Values(
     make_tuple(IMAGE_TSUKUBA,
                []() { return BRISK::create(); },

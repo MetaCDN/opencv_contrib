@@ -6,6 +6,7 @@
 // Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
 
 #include "test_precomp.hpp"
+#include "opencv2/objdetect.hpp"
 
 namespace opencv_test {
 namespace {
@@ -40,9 +41,9 @@ std::string qrcode_images_curved[] = {"curved_1.jpg", /*"curved_2.jpg", "curved_
                                       "curved_4.jpg",*/
                                       "curved_5.jpg", "curved_6.jpg",
                                       /*"curved_7.jpg", "curved_8.jpg"*/};
-// std::string qrcode_images_multiple[] = {"2_qrcodes.png", "3_close_qrcodes.png", "3_qrcodes.png",
-//                                         "4_qrcodes.png", "5_qrcodes.png",       "6_qrcodes.png",
-//                                         "7_qrcodes.png", "8_close_qrcodes.png"};
+std::string qrcode_images_multiple[] = {/*"2_qrcodes.png",*/ "3_close_qrcodes.png", /*"3_qrcodes.png",
+                                          "4_qrcodes.png", "5_qrcodes.png",  "6_qrcodes.png",*/
+                                          "7_qrcodes.png"/*, "8_close_qrcodes.png"*/};
 
 typedef testing::TestWithParam<std::string> Objdetect_QRCode;
 TEST_P(Objdetect_QRCode, regression) {
@@ -236,18 +237,20 @@ typedef testing::TestWithParam<std::string> Objdetect_QRCode_Multi;
 TEST_P(Objdetect_QRCode_Multi, regression) {
     const std::string name_current_image = GetParam();
     const std::string root = "qrcode/multiple/";
+    string path_detect_prototxt, path_detect_caffemodel, path_sr_prototxt, path_sr_caffemodel;
+    string model_version = "_2021-01";
+    path_detect_prototxt = findDataFile("dnn/wechat"+model_version+"/detect.prototxt", false);
+    path_detect_caffemodel = findDataFile("dnn/wechat"+model_version+"/detect.caffemodel", false);
+    path_sr_prototxt = findDataFile("dnn/wechat"+model_version+"/sr.prototxt", false);
+    path_sr_caffemodel = findDataFile("dnn/wechat"+model_version+"/sr.caffemodel", false);
 
     std::string image_path = findDataFile(root + name_current_image);
     Mat src = imread(image_path);
     ASSERT_FALSE(src.empty()) << "Can't read image: " << image_path;
 
     vector<Mat> points;
-    // can not find the model file
-    // so we temporarily comment it out
-    // auto detector = wechat_qrcode::WeChatQRCode(
-    //     findDataFile("detect.prototxt", false), findDataFile("detect.caffemodel", false),
-    //     findDataFile("sr.prototxt", false), findDataFile("sr.caffemodel", false));
-    auto detector = wechat_qrcode::WeChatQRCode();
+    auto detector = wechat_qrcode::WeChatQRCode(path_detect_prototxt, path_detect_caffemodel, path_sr_prototxt,
+                                                path_sr_caffemodel);
     vector<string> decoded_info = detector.detectAndDecode(src, points);
 
     const std::string dataset_config = findDataFile(root + "dataset_config.json");
@@ -283,8 +286,6 @@ TEST_P(Objdetect_QRCode_Multi, regression) {
     }
 }
 
-<<<<<<< HEAD
-=======
 TEST(Objdetect_QRCode_points_position, rotate45) {
     string path_detect_prototxt, path_detect_caffemodel, path_sr_prototxt, path_sr_caffemodel;
     string model_version = "_2021-01";
@@ -340,14 +341,10 @@ TEST(Objdetect_QRCode_points_position, rotate45) {
     EXPECT_NEAR(0, cvtest::norm(Mat(rotateGoldCorners), points2[0].reshape(1, 8), NORM_INF), 11.);
 }
 
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode, testing::ValuesIn(qrcode_images_name));
 INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode_Close, testing::ValuesIn(qrcode_images_close));
 INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode_Monitor, testing::ValuesIn(qrcode_images_monitor));
 INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode_Curved, testing::ValuesIn(qrcode_images_curved));
-<<<<<<< HEAD
-// INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode_Multi, testing::ValuesIn(qrcode_images_multiple));
-=======
 INSTANTIATE_TEST_CASE_P(/**/, Objdetect_QRCode_Multi, testing::ValuesIn(qrcode_images_multiple));
 
 TEST(Objdetect_QRCode_Big, regression) {
@@ -468,7 +465,6 @@ TEST(Objdetect_QRCode_bug, issue_3478) {
     ASSERT_EQ(16, (int) outs[0].size());
     ASSERT_EQ("KFCVW50         ", outs[0]);
 }
->>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
 }  // namespace
 }  // namespace opencv_test
