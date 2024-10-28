@@ -192,6 +192,13 @@ TEST(Features2d_DescriptorExtractor_BEBLID, regression )
     test.safe_run();
 }
 
+TEST(Features2d_DescriptorExtractor_TEBLID, regression )
+{
+    CV_DescriptorExtractorTest<Hamming> test("descriptor-teblid", 1,
+                                             TEBLID::create(6.75));
+    test.safe_run();
+}
+
 #ifdef OPENCV_XFEATURES2D_HAS_VGG_DATA
 TEST( Features2d_DescriptorExtractor_VGG, regression )
 {
@@ -431,7 +438,9 @@ protected:
 
                 for(size_t k=0; k<points.size(); ++k)
                 {
-                    if ( !whiteArea.contains(points[k]) )
+                    // Workaround for https://github.com/opencv/opencv/issues/26016
+                    // To keep its behaviour, points casts to Point_<int>.
+                    if ( !whiteArea.contains(Point_<int>(points[k])) )
                     {
                         ts->printf(cvtest::TS::LOG, "The feature point is outside of the mask.");
                         ts->set_failed_test_info(cvtest::TS::FAIL_INVALID_OUTPUT);

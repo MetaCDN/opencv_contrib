@@ -50,6 +50,9 @@ namespace cv
 namespace xfeatures2d
 {
 
+//! @addtogroup xfeatures2d_nonfree
+//! @{
+
 /** @brief Class for extracting Speeded Up Robust Features from an image @cite Bay06 .
 
 The algorithm parameters:
@@ -109,6 +112,8 @@ public:
 
     CV_WRAP virtual void setUpright(bool upright) = 0;
     CV_WRAP virtual bool getUpright() const = 0;
+
+    CV_WRAP String getDefaultName() const CV_OVERRIDE;
 };
 
 typedef SURF SurfFeatureDetector;

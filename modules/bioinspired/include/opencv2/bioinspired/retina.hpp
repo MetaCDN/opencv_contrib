@@ -94,57 +94,12 @@ enum {
     Here is the default configuration file of the retina module. It gives results such as the first
     retina output shown on the top of this page.
 
-    @code{xml}
-    <?xml version="1.0"?>
-    <opencv_storage>
-    <OPLandIPLparvo>
-        <colorMode>1</colorMode>
-        <normaliseOutput>1</normaliseOutput>
-        <photoreceptorsLocalAdaptationSensitivity>7.5e-01</photoreceptorsLocalAdaptationSensitivity>
-        <photoreceptorsTemporalConstant>9.0e-01</photoreceptorsTemporalConstant>
-        <photoreceptorsSpatialConstant>5.3e-01</photoreceptorsSpatialConstant>
-        <horizontalCellsGain>0.01</horizontalCellsGain>
-        <hcellsTemporalConstant>0.5</hcellsTemporalConstant>
-        <hcellsSpatialConstant>7.</hcellsSpatialConstant>
-        <ganglionCellsSensitivity>7.5e-01</ganglionCellsSensitivity></OPLandIPLparvo>
-    <IPLmagno>
-        <normaliseOutput>1</normaliseOutput>
-        <parasolCells_beta>0.</parasolCells_beta>
-        <parasolCells_tau>0.</parasolCells_tau>
-        <parasolCells_k>7.</parasolCells_k>
-        <amacrinCellsTemporalCutFrequency>2.0e+00</amacrinCellsTemporalCutFrequency>
-        <V0CompressionParameter>9.5e-01</V0CompressionParameter>
-        <localAdaptintegration_tau>0.</localAdaptintegration_tau>
-        <localAdaptintegration_k>7.</localAdaptintegration_k></IPLmagno>
-    </opencv_storage>
-    @endcode
+    @include default_retina_config.xml
 
     Here is the 'realistic" setup used to obtain the second retina output shown on the top of this page.
 
-    @code{xml}
-    <?xml version="1.0"?>
-    <opencv_storage>
-    <OPLandIPLparvo>
-      <colorMode>1</colorMode>
-      <normaliseOutput>1</normaliseOutput>
-      <photoreceptorsLocalAdaptationSensitivity>8.9e-01</photoreceptorsLocalAdaptationSensitivity>
-      <photoreceptorsTemporalConstant>9.0e-01</photoreceptorsTemporalConstant>
-      <photoreceptorsSpatialConstant>5.3e-01</photoreceptorsSpatialConstant>
-      <horizontalCellsGain>0.3</horizontalCellsGain>
-      <hcellsTemporalConstant>0.5</hcellsTemporalConstant>
-      <hcellsSpatialConstant>7.</hcellsSpatialConstant>
-      <ganglionCellsSensitivity>8.9e-01</ganglionCellsSensitivity></OPLandIPLparvo>
-    <IPLmagno>
-      <normaliseOutput>1</normaliseOutput>
-      <parasolCells_beta>0.</parasolCells_beta>
-      <parasolCells_tau>0.</parasolCells_tau>
-      <parasolCells_k>7.</parasolCells_k>
-      <amacrinCellsTemporalCutFrequency>2.0e+00</amacrinCellsTemporalCutFrequency>
-      <V0CompressionParameter>9.5e-01</V0CompressionParameter>
-      <localAdaptintegration_tau>0.</localAdaptintegration_tau>
-      <localAdaptintegration_k>7.</localAdaptintegration_k></IPLmagno>
-    </opencv_storage>
-    @endcode
+    @include realistic_retina_config.xml
+
       */
     struct RetinaParameters{
         //! Outer Plexiform Layer (OPL) and Inner Plexiform Layer Parvocellular (IplParvo) parameters
@@ -251,7 +206,7 @@ public:
     /** @brief Outputs a string showing the used parameters setup
     @return a string which contains formated parameters information
      */
-    CV_WRAP virtual const String printSetup()=0;
+    CV_WRAP virtual String printSetup()=0;
 
     /** @brief Write xml/yml formated parameters information
     @param fs the filename of the xml file that will be open and writen with formatted parameters
@@ -389,9 +344,9 @@ public:
     CV_WRAP virtual void getMagnoRAW(OutputArray retinaOutput_magno)=0;
 
     /** @overload */
-    CV_WRAP virtual const Mat getMagnoRAW() const=0;
+    CV_WRAP virtual Mat getMagnoRAW() const=0;
     /** @overload */
-    CV_WRAP virtual const Mat getParvoRAW() const=0;
+    CV_WRAP virtual Mat getParvoRAW() const=0;
 
     /** @brief Activate color saturation as the final step of the color demultiplexing process -\> this
     saturation is a sigmoide function applied to each channel of the demultiplexed image.
