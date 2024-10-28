@@ -2,8 +2,13 @@ import numpy as np
 import cv2 as cv
 
 # aruco
+<<<<<<< HEAD
 adict = cv.aruco.Dictionary_get(cv.aruco.DICT_4X4_50)
 cv.imshow("marker", cv.aruco.drawMarker(adict, 0, 400))
+=======
+adict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50)
+cv.imshow("marker", adict.generateImageMarker(0, 400))
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
 # random calibration data. your mileage may vary.
 imsize = (800, 600)

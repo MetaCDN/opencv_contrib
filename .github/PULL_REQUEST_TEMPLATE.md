@@ -2,10 +2,17 @@
 
 See details at https://github.com/opencv/opencv/wiki/How_to_contribute#making-a-good-pull-request
 
+<<<<<<< HEAD
 - [ ] I agree to contribute to the project under Apache 2 License.
 - [ ] To the best of my knowledge, the proposed patch is not based on a code under GPL or other license that is incompatible with OpenCV
 - [ ] The PR is proposed to proper branch
 - [ ] There is reference to original bug report and related work
+=======
+- [x] I agree to contribute to the project under Apache 2 License.
+- [x] To the best of my knowledge, the proposed patch is not based on a code under GPL or another license that is incompatible with OpenCV
+- [ ] The PR is proposed to the proper branch
+- [ ] There is a reference to the original bug report and related work
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 - [ ] There is accuracy test, performance test and test data in opencv_extra repository, if applicable
       Patch to opencv_extra has the same branch name.
 - [ ] The feature is well documented and sample code can be built with the project CMake

@@ -78,12 +78,51 @@ namespace aruco {
 //! @addtogroup aruco
 //! @{
 
+<<<<<<< HEAD
 enum CornerRefineMethod{
     CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
     CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
     CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
     CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
 };
+=======
+/** @brief detect markers
+@deprecated Use class ArucoDetector::detectMarkers
+*/
+CV_EXPORTS_W void detectMarkers(InputArray image, const Ptr<Dictionary> &dictionary, OutputArrayOfArrays corners,
+                                OutputArray ids, const Ptr<DetectorParameters> &parameters = makePtr<DetectorParameters>(),
+                                OutputArrayOfArrays rejectedImgPoints = noArray());
+
+/** @brief refine detected markers
+@deprecated Use class ArucoDetector::refineDetectedMarkers
+*/
+CV_EXPORTS_W void refineDetectedMarkers(InputArray image,const  Ptr<Board> &board,
+                                        InputOutputArrayOfArrays detectedCorners,
+                                        InputOutputArray detectedIds, InputOutputArrayOfArrays rejectedCorners,
+                                        InputArray cameraMatrix = noArray(), InputArray distCoeffs = noArray(),
+                                        float minRepDistance = 10.f, float errorCorrectionRate = 3.f,
+                                        bool checkAllOrders = true, OutputArray recoveredIdxs = noArray(),
+                                        const Ptr<DetectorParameters> &parameters = makePtr<DetectorParameters>());
+
+/** @brief draw planar board
+@deprecated Use Board::generateImage
+*/
+CV_EXPORTS_W void drawPlanarBoard(const Ptr<Board> &board, Size outSize, OutputArray img, int marginSize,
+                                  int borderBits);
+
+/** @brief get board object and image points
+@deprecated Use Board::matchImagePoints
+*/
+CV_EXPORTS_W void getBoardObjectAndImagePoints(const Ptr<Board> &board, InputArrayOfArrays detectedCorners,
+                                               InputArray detectedIds, OutputArray objPoints, OutputArray imgPoints);
+
+
+/** @deprecated Use Board::matchImagePoints and cv::solvePnP
+ */
+CV_EXPORTS_W int estimatePoseBoard(InputArrayOfArrays corners, InputArray ids, const Ptr<Board> &board,
+                                   InputArray cameraMatrix, InputArray distCoeffs, InputOutputArray rvec,
+                                   InputOutputArray tvec, bool useExtrinsicGuess = false);
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
 /**
  * @brief Parameters for the detectMarker process:
@@ -394,6 +433,7 @@ class CV_EXPORTS_W GridBoard : public Board {
  * @param useExtrinsicGuess defines whether initial guess for \b rvec and \b tvec will be used or not.
  * Used as initial guess if not empty.
  *
+<<<<<<< HEAD
  * This function receives the detected markers and returns the pose of a marker board composed
  * by those markers.
  * A Board of marker has a single world coordinate system which is defined by the board layout.
@@ -402,6 +442,13 @@ class CV_EXPORTS_W GridBoard : public Board {
  * Input markers that are not included in the board layout are ignored.
  * The function returns the number of markers from the input employed for the board pose estimation.
  * Note that returning a 0 means the pose has not been estimated.
+=======
+ * This function estimates a Charuco board pose from some detected corners.
+ * The function checks if the input corners are enough and valid to perform pose estimation.
+ * If pose estimation is valid, returns true, else returns false.
+ * @deprecated Use CharucoBoard::matchImagePoints and cv::solvePnP
+ * @sa use cv::drawFrameAxes to get world coordinate system axis for object points
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
  */
 CV_EXPORTS_W int estimatePoseBoard(InputArrayOfArrays corners, InputArray ids, const Ptr<Board> &board,
                                    InputArray cameraMatrix, InputArray distCoeffs, InputOutputArray rvec,

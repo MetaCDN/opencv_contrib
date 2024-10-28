@@ -147,7 +147,12 @@ void cv::cuda::meanStdDev(InputArray _src, OutputArray _dst, Stream& stream)
     sz.width  = src.cols;
     sz.height = src.rows;
 
+#if (CUDA_VERSION >= 12040)
+    size_t bufSize;
+#else
     int bufSize;
+#endif
+
 #if (CUDA_VERSION <= 4020)
     nppSafeCall( nppiMeanStdDev8uC1RGetBufferHostSize(sz, &bufSize) );
 #else
@@ -155,7 +160,12 @@ void cv::cuda::meanStdDev(InputArray _src, OutputArray _dst, Stream& stream)
 #endif
 
     BufferPool pool(stream);
+<<<<<<< HEAD
     GpuMat buf = pool.getBuffer(1, bufSize, CV_8UC1);
+=======
+    CV_Assert(bufSize <= std::numeric_limits<int>::max());
+    GpuMat buf = pool.getBuffer(1, static_cast<int>(bufSize), gsrc.type());
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 
     // detail: https://github.com/opencv/opencv/issues/11063
     //NppStreamHandler h(StreamAccessor::getStream(stream));
@@ -181,6 +191,74 @@ void cv::cuda::meanStdDev(InputArray _src, Scalar& mean, Scalar& stddev)
     stddev = Scalar(vals[1]);
 }
 
+<<<<<<< HEAD
+=======
+void cv::cuda::meanStdDev(InputArray _src, Scalar& mean, Scalar& stddev, InputArray _mask)
+{
+    Stream& stream = Stream::Null();
+
+    HostMem dst;
+    meanStdDev(_src, dst, _mask, stream);
+
+    stream.waitForCompletion();
+
+    double vals[2];
+    dst.createMatHeader().copyTo(Mat(1, 2, CV_64FC1, &vals[0]));
+
+    mean = Scalar(vals[0]);
+    stddev = Scalar(vals[1]);
+}
+
+void cv::cuda::meanStdDev(InputArray src, OutputArray dst, InputArray mask, Stream& stream)
+{
+    if (!deviceSupports(FEATURE_SET_COMPUTE_13))
+        CV_Error(cv::Error::StsNotImplemented, "Not sufficient compute capebility");
+
+    const GpuMat gsrc = getInputMat(src, stream);
+    const GpuMat gmask = getInputMat(mask, stream);
+
+#if (CUDA_VERSION <= 4020)
+    CV_Assert( gsrc.type() == CV_8UC1 );
+#else
+    CV_Assert( (gsrc.type() == CV_8UC1) || (gsrc.type() == CV_32FC1) );
+#endif
+
+    GpuMat gdst = getOutputMat(dst, 1, 2, CV_64FC1, stream);
+
+    NppiSize sz;
+    sz.width  = gsrc.cols;
+    sz.height = gsrc.rows;
+
+#if (CUDA_VERSION >= 12040)
+    size_t bufSize;
+#else
+    int bufSize;
+#endif
+
+#if (CUDA_VERSION <= 4020)
+        nppSafeCall( nppiMeanStdDev8uC1MRGetBufferHostSize(sz, &bufSize) );
+#else
+    if (gsrc.type() == CV_8UC1)
+        nppSafeCall( nppiMeanStdDevGetBufferHostSize_8u_C1MR(sz, &bufSize) );
+    else
+        nppSafeCall( nppiMeanStdDevGetBufferHostSize_32f_C1MR(sz, &bufSize) );
+#endif
+
+    BufferPool pool(stream);
+    CV_Assert(bufSize <= std::numeric_limits<int>::max());
+    GpuMat buf = pool.getBuffer(1, static_cast<int>(bufSize), gsrc.type());
+
+    if(gsrc.type() == CV_8UC1)
+        nppSafeCall( nppiMean_StdDev_8u_C1MR(gsrc.ptr<Npp8u>(), static_cast<int>(gsrc.step), gmask.ptr<Npp8u>(), static_cast<int>(gmask.step),
+                                             sz, buf.ptr<Npp8u>(), gdst.ptr<Npp64f>(), gdst.ptr<Npp64f>() + 1) );
+    else
+        nppSafeCall( nppiMean_StdDev_32f_C1MR(gsrc.ptr<Npp32f>(), static_cast<int>(gsrc.step), gmask.ptr<Npp8u>(), static_cast<int>(gmask.step),
+                                              sz, buf.ptr<Npp8u>(), gdst.ptr<Npp64f>(), gdst.ptr<Npp64f>() + 1) );
+
+    syncOutput(gdst, dst, stream);
+}
+
+>>>>>>> 80f1ca2442982ed518076cd88cf08c71155b30f6
 //////////////////////////////////////////////////////////////////////////////
 // rectStdDev
 
